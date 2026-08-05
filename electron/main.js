@@ -1,7 +1,17 @@
 const { app, BrowserWindow, dialog } = require('electron');
 const http = require('http');
-const { ensureInitialized, startServer, stopServer, PORT } = require('./backend');
+const {
+  ensureInitialized, startServer, stopServer, PORT,
+  startBackupScheduler, stopBackupScheduler,
+} = require('./backend');
 const { getLanIp } = require('./lan-ip');
+
+// Fija el nombre explícito (en vez de dejar que Electron infiera uno del
+// package.json, que da resultados distintos en dev vs empaquetado) — de esto
+// depende app.getPath('userData'), o sea dónde vive la base real del
+// comercio. Sin tilde/espacios a propósito: es más seguro para pegar en
+// rutas manuales (PowerShell, scripts de soporte) sin problemas de encoding.
+app.setName('StockFerreteria');
 
 let mainWindow = null;
 
@@ -75,17 +85,20 @@ async function boot() {
 
   createWindow();
   showLanIpNotice();
+  startBackupScheduler();
 }
 
 app.whenReady().then(boot);
 
 app.on('window-all-closed', () => {
   stopServer();
+  stopBackupScheduler();
   if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('before-quit', () => {
   stopServer();
+  stopBackupScheduler();
 });
 
 app.on('activate', () => {

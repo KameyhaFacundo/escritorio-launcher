@@ -139,4 +139,58 @@ function stopServer() {
   }
 }
 
-module.exports = { ensureInitialized, startServer, stopServer, PORT };
+const BACKUP_MAX_AGE_MS = 24 * 60 * 60 * 1000; // no hace un backup nuevo si ya hay uno de menos de 24h
+const BACKUP_CHECK_INTERVAL_MS = 60 * 60 * 1000; // pero chequea seguido, por si la app queda abierta días
+
+/**
+ * Corre `php artisan backup:run` (copia + comprime la base SQLite a
+ * storage/app/backups) si el más reciente que hay ahí tiene más de 24h, o si
+ * todavía no hay ninguno. No hace falta que la app esté cerrada ni nada — el
+ * comando lee la base, no la bloquea. Si falla, solo lo loguea: un backup
+ * fallido no tiene que tumbar el resto del sistema.
+ */
+function runBackupIfDue() {
+  const dir = dataDir();
+  const backupsDir = path.join(dir, 'storage', 'app', 'backups');
+
+  let needsBackup = true;
+  try {
+    const files = fs.readdirSync(backupsDir).filter((f) => f.endsWith('.gz'));
+    if (files.length > 0) {
+      const newest = Math.max(...files.map((f) => fs.statSync(path.join(backupsDir, f)).mtimeMs));
+      needsBackup = Date.now() - newest > BACKUP_MAX_AGE_MS;
+    }
+  } catch {
+    // storage/app/backups todavía no existe — corre el primero.
+  }
+
+  if (!needsBackup) return;
+
+  const proc = spawn(phpBinary(), ['artisan', 'backup:run', '--ansi'], {
+    cwd: backendPath(),
+    env: backendEnv(dir),
+  });
+  proc.stdout.on('data', (d) => console.log(`[backup] ${d}`));
+  proc.stderr.on('data', (d) => console.error(`[backup] ${d}`));
+  proc.on('exit', (code) => {
+    if (code !== 0) console.error(`El backup automático falló (code=${code})`);
+    else console.log('Backup automático generado.');
+  });
+}
+
+let backupInterval = null;
+
+function startBackupScheduler() {
+  runBackupIfDue();
+  backupInterval = setInterval(runBackupIfDue, BACKUP_CHECK_INTERVAL_MS);
+}
+
+function stopBackupScheduler() {
+  if (backupInterval) clearInterval(backupInterval);
+  backupInterval = null;
+}
+
+module.exports = {
+  ensureInitialized, startServer, stopServer, PORT,
+  startBackupScheduler, stopBackupScheduler,
+};
