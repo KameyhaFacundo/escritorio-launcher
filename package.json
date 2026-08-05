@@ -1,0 +1,40 @@
+{
+  "name": "escritorio-launcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Empaqueta back-sistema-stock-escritorio + front-sistema-stock-escritorio como app de escritorio Windows",
+  "main": "electron/main.js",
+  "scripts": {
+    "build-resources": "node scripts/build-resources.js",
+    "dist": "npm run build-resources && electron-builder",
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.kamex.stockescritorio",
+    "productName": "Stock Ferreteria",
+    "directories": {
+      "output": "dist-installer"
+    },
+    "files": [
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "resources/backend", "to": "backend" },
+      { "from": "resources/php", "to": "php" }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "perMachine": false,
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false
+    }
+  }
+}
