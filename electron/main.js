@@ -115,13 +115,24 @@ function checkForAppUpdates() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
+  // "Reiniciar ahora" además de "Más tarde" — con solo "Entendido" (como
+  // estaba antes), la instalación quedaba pendiente para quien sabe cuándo
+  // se cierre el programa, ya lejos de haber leído este aviso: si en ese
+  // momento alguien reabre rápido, pega justo en los segundos en que NSIS
+  // está reemplazando el .exe y Windows tira "no puede encontrar el
+  // archivo". Reiniciar ya mismo acota esa ventana a un momento en el que
+  // el usuario sabe que está pasando.
   autoUpdater.on('update-downloaded', () => {
     dialog.showMessageBox({
       type: 'info',
       title: 'Actualización lista',
       message: 'Hay una versión nueva de Stock Ferretería.',
-      detail: 'Se va a instalar sola la próxima vez que cierres el programa.',
-      buttons: ['Entendido'],
+      detail: 'Se recomienda reiniciar ahora para instalarla. Si elegís "Más tarde", se va a instalar sola la próxima vez que cierres el programa — en ese momento esperá unos segundos antes de volver a abrirla.',
+      buttons: ['Reiniciar ahora', 'Más tarde'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then(({ response }) => {
+      if (response === 0) autoUpdater.quitAndInstall();
     });
   });
 
