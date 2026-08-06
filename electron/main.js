@@ -122,6 +122,12 @@ function checkForAppUpdates() {
   autoUpdater.autoInstallOnAppQuit = false;
 
   autoUpdater.on('update-downloaded', () => {
+    // Además del diálogo nativo (que se ve una sola vez), le avisa al front
+    // para que deje un punto/indicador permanente en el sidebar — así si
+    // cierran el diálogo sin prestar atención, el aviso sigue visible en
+    // vez de perderse.
+    mainWindow?.webContents.send('app-update-listo');
+
     dialog.showMessageBox({
       type: 'info',
       title: 'Actualización lista',

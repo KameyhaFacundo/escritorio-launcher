@@ -7,6 +7,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const LAUNCHER_ROOT = path.join(__dirname, '..');
+const LAUNCHER_VERSION = require(path.join(LAUNCHER_ROOT, 'package.json')).version;
 const SIBLINGS = path.join(LAUNCHER_ROOT, '..');
 const BACK_REPO = path.join(SIBLINGS, 'back-sistema-stock');
 const FRONT_REPO = path.join(SIBLINGS, 'front-sistema-stock');
@@ -58,6 +59,10 @@ function buildFront() {
       // (http://<ip-lan>:8000/) sin ningún cambio — ver ADR en el plan de Fase 1.
       VITE_API_URL: '/api/v1/',
       VITE_DEMO_MODE: 'false',
+      // El número que se ve en el pie del sidebar (v0.1.2, etc.) — antes
+      // quedaba pegado en un "1.0.0" fijo en el código del front, sin
+      // relación con la versión real del instalador.
+      VITE_APP_VERSION: LAUNCHER_VERSION,
     },
   });
 
