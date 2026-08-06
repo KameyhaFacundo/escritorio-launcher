@@ -15,7 +15,14 @@ const { obtenerCodigoDispositivo, licenciaValida, activar } = require('./license
 // depende app.getPath('userData'), o sea dónde vive la base real del
 // comercio. Sin tilde/espacios a propósito: es más seguro para pegar en
 // rutas manuales (PowerShell, scripts de soporte) sin problemas de encoding.
-app.setName('StockFerreteria');
+//
+// clientAppName viene inyectado por clients/<cliente>/config.json vía
+// -c.extraMetadata en scripts/release.js — así cada cliente tiene su propia
+// carpeta de datos (AppData\Roaming\<nombre>) y dos clientes instalados en
+// la misma PC (ej. de prueba) nunca comparten ni pisan la base del otro.
+// Sin ese dato (build manual, "npm start" en dev) cae en el nombre de
+// siempre, para no romper la instalación real ya existente.
+app.setName(require('../package.json').clientAppName || 'StockFerreteria');
 
 let mainWindow = null;
 

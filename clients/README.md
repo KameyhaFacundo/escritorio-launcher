@@ -22,11 +22,22 @@ clients/
 ```json
 {
   "productName": "Nombre que ve Windows en el instalador",
+  "appId": "com.kamex.nombre-del-cliente",
+  "appName": "NombreDelCliente",
   "channel": "nombre-del-canal",
   "icon": "build/icon.ico"
 }
 ```
 
+- `appId` y `appName` — **tienen que ser únicos por cliente, siempre.**
+  Windows usa `appId` para saber "¿esta app ya está instalada?" — con el
+  mismo `appId` para dos clientes distintos, instalar el segundo actualiza
+  EN EL LUGAR la carpeta de instalación del primero en vez de instalarse
+  aparte (pasa sin importar qué `productName` tenga cada uno). `appName`
+  controla dónde vive la base de datos real de ese cliente
+  (`AppData\Roaming\<appName>`) — con el mismo valor para dos clientes,
+  ambos leerían/pisarían la misma base. Sin nombre ni tildes ni espacios,
+  como `StockFerreteria`.
 - `channel`: minúsculas, sin espacios ni tildes ni acentos (ej.
   `ferreteria-castro`, no `Ferretería Castro`) — se usa tal cual en el nombre
   de archivo que GitHub genera. `stock-ferreteria` (el cliente actual) usa
@@ -38,6 +49,11 @@ clients/
   nombre de canal desde el primer build.
 - `icon`: ruta relativa a este repo. Si el cliente no tiene ícono propio, se
   puede dejar `build/icon.ico` (el genérico).
+
+**Para probar dos clientes en la misma PC** (ej. de desarrollo): con
+`appId`/`appName` distintos, quedan instalados aparte, cada uno con su
+propia carpeta y su propia base — no hace falta desinstalar uno para
+probar el otro.
 
 ## Publicar una actualización para un cliente puntual
 

@@ -18,14 +18,14 @@ if (!fs.existsSync(configPath)) {
 }
 
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-for (const campo of ['productName', 'channel', 'icon']) {
+for (const campo of ['productName', 'appId', 'appName', 'channel', 'icon']) {
   if (!config[campo]) {
     console.error(`clients/${cliente}/config.json le falta "${campo}".`);
     process.exit(1);
   }
 }
 
-console.log(`\nPublicando "${config.productName}" — canal "${config.channel}"\n`);
+console.log(`\nPublicando "${config.productName}" — canal "${config.channel}", appId "${config.appId}"\n`);
 
 execFileSync('node', ['scripts/build-resources.js'], { cwd: LAUNCHER_ROOT, stdio: 'inherit' });
 
@@ -34,4 +34,15 @@ execFileSync('npx', [
   `-c.productName=${config.productName}`,
   `-c.win.icon=${config.icon}`,
   `-c.publish.channel=${config.channel}`,
+  // appId distinto por cliente: es lo que Windows usa para saber si "ya
+  // está instalado" — con el mismo appId para todos, instalar un cliente
+  // nuevo actualizaba EN EL LUGAR la carpeta del cliente anterior en vez
+  // de instalarse aparte (verificado: quedaba todo en la carpeta del
+  // primer cliente que se instaló alguna vez en esa PC, sin importar qué
+  // productName tuviera el build de después).
+  `-c.appId=${config.appId}`,
+  // clientAppName controla app.getPath('userData') (ver electron/main.js)
+  // — sin esto, dos clientes instalados en la misma PC leerían/pisarían
+  // la misma base de datos.
+  `-c.extraMetadata.clientAppName=${config.appName}`,
 ], { cwd: LAUNCHER_ROOT, stdio: 'inherit', shell: true });

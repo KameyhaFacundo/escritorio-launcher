@@ -1,5 +1,7 @@
 {
   "productName": "Nombre que ve Windows en el instalador",
+  "appId": "com.kamex.nombre-del-cliente",
+  "appName": "NombreDelCliente",
   "channel": "nombre-del-canal",
   "icon": "build/icon.ico"
 }
