@@ -3,7 +3,13 @@ const path = require('path');
 const { spawnSync, spawn } = require('child_process');
 const { backendPath, phpBinary, dataDir } = require('./paths');
 
-const PORT = 8000;
+// clientPort viene inyectado por clients/<cliente>/config.json (ver
+// scripts/release.js) — puerto distinto por cliente para que, si dos
+// clientes están instalados y corriendo en la misma PC (de prueba, o algún
+// día en la misma red), uno no termine hablándole al servidor del otro por
+// compartir el mismo puerto (pasó de verdad: la ventana de un cliente se
+// conectó al backend real de otro que ya estaba corriendo en el 8000).
+const PORT = require('../package.json').clientPort || 8000;
 
 function ensureDataDirs(dir) {
   const sub = [
