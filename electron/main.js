@@ -11,6 +11,28 @@ const { getLanIp } = require('./lan-ip');
 const { obtenerCodigoDispositivo, licenciaValida, activar } = require('./license');
 const gdrive = require('./gdrive');
 
+// Fija el nombre explícito ANTES de pedir el lock de instancia única de
+// abajo — en ese orden, no al revés. requestSingleInstanceLock() toca
+// app.getPath('userData') internamente para su propio archivo de lock, y
+// Electron cachea esa ruta la primera vez que se calcula: pedir el lock
+// antes de poner el nombre dejaba la carpeta de datos fija en el nombre
+// genérico de package.json ("escritorio-launcher") para siempre, sin
+// importar qué setName() se llamara después (bug real, encontrado en vivo
+// probando Palomar: terminó usando AppData\Roaming\escritorio-launcher en
+// vez de \Palomar). De esto depende dónde vive la base real del comercio.
+// Sin tilde/espacios a propósito: es más seguro para pegar en rutas
+// manuales (PowerShell, scripts de soporte) sin problemas de encoding.
+//
+// clientAppName viene inyectado por clients/<cliente>/config.json vía
+// -c.extraMetadata en scripts/release.js — así cada cliente tiene su propia
+// carpeta de datos (AppData\Roaming\<nombre>) y dos clientes instalados en
+// la misma PC (ej. de prueba) nunca comparten ni pisan la base del otro.
+// Sin ese dato (build manual, "npm start" en dev) cae en el nombre de
+// siempre, para no romper la instalación real ya existente.
+app.setName(require('../package.json').clientAppName || 'StockFerreteria');
+
+let mainWindow = null;
+
 // Sin esto, abrir el ícono dos veces (muy común: tarda en abrir la primera
 // vez y el usuario vuelve a tocar) levanta DOS procesos completos a la vez
 // — ambos corren ensureInitialized() en paralelo contra la MISMA base
@@ -30,22 +52,6 @@ app.on('second-instance', () => {
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.focus();
 });
-
-// Fija el nombre explícito (en vez de dejar que Electron infiera uno del
-// package.json, que da resultados distintos en dev vs empaquetado) — de esto
-// depende app.getPath('userData'), o sea dónde vive la base real del
-// comercio. Sin tilde/espacios a propósito: es más seguro para pegar en
-// rutas manuales (PowerShell, scripts de soporte) sin problemas de encoding.
-//
-// clientAppName viene inyectado por clients/<cliente>/config.json vía
-// -c.extraMetadata en scripts/release.js — así cada cliente tiene su propia
-// carpeta de datos (AppData\Roaming\<nombre>) y dos clientes instalados en
-// la misma PC (ej. de prueba) nunca comparten ni pisan la base del otro.
-// Sin ese dato (build manual, "npm start" en dev) cae en el nombre de
-// siempre, para no romper la instalación real ya existente.
-app.setName(require('../package.json').clientAppName || 'StockFerreteria');
-
-let mainWindow = null;
 
 function waitForServer(url, { timeoutMs = 30000, intervalMs = 300 } = {}) {
   const startedAt = Date.now();
