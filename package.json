@@ -7,7 +7,7 @@
   "scripts": {
     "build-resources": "node scripts/build-resources.js",
     "dist": "npm run build-resources && electron-builder",
-    "release": "npm run build-resources && electron-builder --publish always",
+    "release": "node scripts/release.js",
     "start": "electron ."
   },
   "dependencies": {

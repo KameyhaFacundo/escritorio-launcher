@@ -6,3 +6,9 @@ dist-installer
 # Clave privada de activación — nunca se sube ni se empaqueta. Si se pierde,
 # no se pueden generar más códigos de activación (ver license-tool/).
 license-tool/clave-privada.pem
+
+# Builds por cliente (ver clients/README.md) — solo la plantilla queda en git.
+clients/*
+!clients/README.md
+!clients/_template/
+!clients/_template/**

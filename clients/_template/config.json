@@ -1,0 +1,5 @@
+{
+  "productName": "Nombre que ve Windows en el instalador",
+  "channel": "nombre-del-canal",
+  "icon": "build/icon.ico"
+}
