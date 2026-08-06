@@ -105,29 +105,28 @@ ipcMain.handle('imprimir-ticket', (_event, html) => imprimirTicketDirecto(html))
 
 // Chequea una sola vez, al arrancar — nunca en medio de una sesión, para no
 // interrumpir una venta. Se descarga sola en segundo plano si hay una
-// versión nueva y se instala recién la próxima vez que se cierra el
-// programa (autoInstallOnAppQuit), reutilizando el mismo apagado ordenado
-// de stopServer()/stopQueueWorker() de más abajo. El repo de GitHub es
-// público, así que no hace falta ningún token para chequear ni descargar.
+// versión nueva, pero NUNCA se instala sola (autoInstallOnAppQuit=false):
+// que se instale "cuando cierres" sonaba bien pero en la práctica cierran
+// el programa en cualquier momento del día, no solo al final — force la
+// instalación justo cuando hay un cliente esperando. En vez de eso, se le
+// pregunta con "Reiniciar ahora" / "Más tarde": si elige más tarde, se le
+// vuelve a preguntar recién la próxima vez que ABRA el programa (no al
+// cerrar), así el que decide el momento es el dueño del local, no el
+// sistema — puede esperar a después de cerrar, sin nadie en el mostrador.
+// El repo de GitHub es público, así que no hace falta ningún token para
+// chequear ni descargar.
 function checkForAppUpdates() {
   if (!app.isPackaged) return; // en dev no hay instalador ni feed de releases
 
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = false;
 
-  // "Reiniciar ahora" además de "Más tarde" — con solo "Entendido" (como
-  // estaba antes), la instalación quedaba pendiente para quien sabe cuándo
-  // se cierre el programa, ya lejos de haber leído este aviso: si en ese
-  // momento alguien reabre rápido, pega justo en los segundos en que NSIS
-  // está reemplazando el .exe y Windows tira "no puede encontrar el
-  // archivo". Reiniciar ya mismo acota esa ventana a un momento en el que
-  // el usuario sabe que está pasando.
   autoUpdater.on('update-downloaded', () => {
     dialog.showMessageBox({
       type: 'info',
       title: 'Actualización lista',
       message: 'Hay una versión nueva de Stock Ferretería.',
-      detail: 'Se recomienda reiniciar ahora para instalarla. Si elegís "Más tarde", se va a instalar sola la próxima vez que cierres el programa — en ese momento esperá unos segundos antes de volver a abrirla.',
+      detail: 'Instalala en un momento sin clientes esperando — no tarda mucho, pero conviene no tener el mostrador ocupado mientras pasa. Si elegís "Más tarde", te lo vuelvo a preguntar la próxima vez que abras el programa.',
       buttons: ['Reiniciar ahora', 'Más tarde'],
       defaultId: 0,
       cancelId: 1,
