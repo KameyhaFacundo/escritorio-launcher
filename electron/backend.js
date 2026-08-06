@@ -139,6 +139,48 @@ function stopServer() {
   }
 }
 
+let queueProcess = null;
+
+/**
+ * Arranca `php artisan queue:work` como proceso hijo, supervisado igual que
+ * startServer() — sin esto los jobs encolados (facturas/notas de crédito que
+ * quedaron "pendiente" por un corte de ARCA, ver EmitirFacturaJob en el
+ * backend) nunca se procesan solos. `--tries=1` porque los reintentos ya los
+ * maneja el propio Job (backoff/retryUntil); acá alcanza con reintentar el
+ * *proceso* si se cae, no cada job individual dos veces.
+ */
+function startQueueWorker() {
+  const dir = dataDir();
+
+  queueProcess = spawn(
+    phpBinary(),
+    ['artisan', 'queue:work', '--sleep=1', '--tries=1'],
+    { cwd: backendPath(), env: backendEnv(dir) }
+  );
+
+  queueProcess.stdout.on('data', (d) => console.log(`[queue] ${d}`));
+  queueProcess.stderr.on('data', (d) => console.error(`[queue] ${d}`));
+
+  queueProcess.on('exit', (code, signal) => {
+    const stoppedByUs = queueProcess === null;
+    queueProcess = null;
+    if (!stoppedByUs) {
+      console.error(`El worker de colas se cayó (code=${code}, signal=${signal}), reintentando...`);
+      setTimeout(startQueueWorker, 1500);
+    }
+  });
+
+  return queueProcess;
+}
+
+function stopQueueWorker() {
+  if (queueProcess) {
+    const p = queueProcess;
+    queueProcess = null;
+    p.kill();
+  }
+}
+
 const BACKUP_MAX_AGE_MS = 24 * 60 * 60 * 1000; // no hace un backup nuevo si ya hay uno de menos de 24h
 const BACKUP_CHECK_INTERVAL_MS = 60 * 60 * 1000; // pero chequea seguido, por si la app queda abierta días
 
@@ -192,5 +234,6 @@ function stopBackupScheduler() {
 
 module.exports = {
   ensureInitialized, startServer, stopServer, PORT,
+  startQueueWorker, stopQueueWorker,
   startBackupScheduler, stopBackupScheduler,
 };

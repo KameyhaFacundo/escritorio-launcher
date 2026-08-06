@@ -2,3 +2,7 @@ node_modules
 resources
 dist-installer
 *.log
+
+# Clave privada de activación — nunca se sube ni se empaqueta. Si se pierde,
+# no se pueden generar más códigos de activación (ver license-tool/).
+license-tool/clave-privada.pem

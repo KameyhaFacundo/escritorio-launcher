@@ -16,15 +16,32 @@
 - Sacado el registro público del SaaS (`/onboarding`, "Crear cuenta",
   `AuthController::register`) — no tenía sentido en un sistema de un solo
   comercio y era una superficie sin usar que igual quedaba viva.
-
-## En curso / próximo
-
-- **Resiliencia de ARCA offline** — hoy si se corta internet a mitad de
-  emitir una factura, se pierde o queda en un estado raro. Falta una cola
-  de reintento con estado "pendiente de CAE" visible en la UI.
-- **Actualizaciones automáticas** — hoy cada versión nueva es reinstalar a
-  mano con un instalador nuevo. Falta algo tipo `electron-updater` contra
-  los releases de GitHub.
+- **Resiliencia de ARCA offline** — si se corta internet a mitad de emitir
+  una factura o nota de crédito, ya no se pierde ni queda en un estado raro:
+  queda "pendiente", se reintenta sola en segundo plano (cola de Laravel +
+  `EmitirFacturaJob`/`EmitirNotaCreditoJob`, worker corriendo dentro de la
+  app vía `startQueueWorker()`), y la cajera lo ve reflejado en pantalla
+  (Home, Dashboard, Facturas) sin hacer nada manual.
+- **IA (Gemini) desactivada** — asistente, sugerencias de precio/categoría,
+  generación de imágenes y escaneo de facturas por IA quedaron comentados
+  (no borrados) tanto en las rutas del backend como en el flag `tieneIA` de
+  `usePlan.js` — se reactiva todo volviendo ese flag a `true` y
+  descomentando las rutas correspondientes en `routes/api.php`.
+- **Login** simplificado a un solo formulario (sin panel de marca ni
+  "Continuar con Google", que no aplican a un sistema de un solo comercio).
+- **Compras por proveedor** — desde el detalle de un producto se puede ver
+  a qué proveedores se le compró y a qué precio cada vez (antes solo se
+  veía la última compra, sin desglose).
+- **Paleta de colores** propia del cliente (mostaza/dorado + modo oscuro en
+  marrón, en vez de los colores genéricos de Kamex).
+- **Actualizaciones automáticas** — la app chequea sola al arrancar contra
+  los releases de `github.com/KameyhaFacundo/escritorio-launcher` (repo
+  público, sin token embebido), descarga en segundo plano si hay una
+  versión nueva, y la instala sola al cerrar el programa
+  (`electron-updater`, ver `checkForAppUpdates()` en `electron/main.js`).
+  Para publicar una release nueva: subir la versión en `package.json` y
+  correr `npm run release` con un `GH_TOKEN` (Personal Access Token de
+  GitHub, scope `repo`) en el entorno.
 
 ## Futuro (sin definir todavía)
 

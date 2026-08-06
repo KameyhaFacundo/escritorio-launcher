@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Activación requerida</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #0f1115; color: #e6e8ec; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .card { width: 400px; padding: 28px; }
+  h1 { font-size: 17px; margin: 0 0 6px; }
+  p { font-size: 13px; color: #a3a8b3; line-height: 1.5; margin: 0 0 18px; }
+  label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #a3a8b3; margin-bottom: 6px; }
+  .device-code {
+    font-family: ui-monospace, monospace; font-size: 15px; font-weight: 700; letter-spacing: 1px;
+    background: #1a1d24; border: 1px solid #2a2e37; border-radius: 8px; padding: 12px 14px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 20px;
+  }
+  .device-code button {
+    background: none; border: 1px solid #2a2e37; color: #e6e8ec; border-radius: 6px;
+    padding: 5px 10px; font-size: 11px; cursor: pointer;
+  }
+  .device-code button:hover { border-color: #D4A017; color: #D4A017; }
+  input[type=text] {
+    width: 100%; box-sizing: border-box; background: #1a1d24; border: 1px solid #2a2e37; border-radius: 8px;
+    padding: 11px 14px; color: #e6e8ec; font-size: 14px; font-family: ui-monospace, monospace; margin-bottom: 14px;
+  }
+  input[type=text]:focus { outline: none; border-color: #D4A017; }
+  button.primary {
+    width: 100%; background: #D4A017; color: #1a1206; border: none; border-radius: 8px;
+    padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  button.primary:hover { filter: brightness(1.08); }
+  button.primary:disabled { opacity: .5; cursor: default; }
+  .error { color: #ef4444; font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Activación requerida</h1>
+    <p>Este sistema necesita activarse en esta PC. Mandale el código de abajo a quien te lo instaló para que te pase el código de activación.</p>
+
+    <label>Código de esta PC</label>
+    <div class="device-code">
+      <span id="deviceCode">—</span>
+      <button id="copiar">Copiar</button>
+    </div>
+
+    <label>Código de activación</label>
+    <input type="text" id="activationCode" placeholder="Pegá acá el código que te pasaron" autocomplete="off" />
+    <button class="primary" id="activar">Activar</button>
+    <div class="error" id="error"></div>
+  </div>
+
+  <script>
+    window.licenseAPI.onDeviceCode((code) => {
+      document.getElementById('deviceCode').textContent = code;
+    });
+
+    document.getElementById('copiar').addEventListener('click', () => {
+      const code = document.getElementById('deviceCode').textContent;
+      navigator.clipboard.writeText(code);
+    });
+
+    document.getElementById('activar').addEventListener('click', async () => {
+      const btn = document.getElementById('activar');
+      const errorEl = document.getElementById('error');
+      const code = document.getElementById('activationCode').value;
+      errorEl.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Activando...';
+      const ok = await window.licenseAPI.activar(code);
+      if (!ok) {
+        errorEl.textContent = 'Código inválido para esta PC. Revisá que lo hayas copiado completo.';
+        btn.disabled = false;
+        btn.textContent = 'Activar';
+      }
+      // Si activó bien, el proceso principal cierra esta ventana solo.
+    });
+
+    document.getElementById('activationCode').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('activar').click();
+    });
+  </script>
+</body>
+</html>

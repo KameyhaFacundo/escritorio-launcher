@@ -63,6 +63,10 @@ function buildFront() {
 
   const distDir = path.join(FRONT_REPO, 'dist');
   const publicDir = path.join(BACKEND_OUT, 'public');
+  // Cada build de Vite hashea los nombres de /assets/* — sin borrar la carpeta
+  // vieja antes de copiar, los chunks de builds anteriores se quedan huérfanos
+  // ahí para siempre (no rompen nada, pero acumulan basura build tras build).
+  fs.rmSync(path.join(publicDir, 'assets'), { recursive: true, force: true });
   console.log(`Copiando ${distDir} -> ${publicDir}`);
   fs.cpSync(distDir, publicDir, { recursive: true });
 }

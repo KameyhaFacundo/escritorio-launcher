@@ -76,10 +76,21 @@ pendiente).
 
 ## Actualizaciones
 
-Por ahora las actualizaciones son manuales: cuando haya una versión nueva,
-se instala igual que la primera vez, con un instalador nuevo. Los datos
-(ventas, stock, clientes, backups) **no se pierden** al actualizar — quedan
-guardados aparte, en una carpeta separada de donde se instala el programa.
+La aplicación se actualiza sola: cada vez que arranca, chequea en segundo
+plano si hay una versión nueva y, si la hay, la descarga sin interrumpir
+nada. Cuando ya está lista aparece un aviso ("Hay una versión nueva de
+Stock Ferretería") — no hace falta hacer nada en ese momento, se instala
+sola la próxima vez que se cierra el programa (por ejemplo, al final del
+día). Si no hay internet, la app sigue funcionando con total normalidad, y
+vuelve a chequear la próxima vez que arranque con conexión.
+
+Los datos (ventas, stock, clientes, backups) **no se pierden** al
+actualizar — quedan guardados aparte, en una carpeta separada de donde se
+instala el programa.
+
+La primera instalación (en una PC nueva) siempre es manual, con el
+instalador que te pasen — las actualizaciones automáticas empiezan a
+correr recién después de esa primera instalación.
 
 ## Si algo no funciona
 

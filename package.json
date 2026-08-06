@@ -7,7 +7,11 @@
   "scripts": {
     "build-resources": "node scripts/build-resources.js",
     "dist": "npm run build-resources && electron-builder",
+    "release": "npm run build-resources && electron-builder --publish always",
     "start": "electron ."
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
     "electron": "^33.2.0",
@@ -35,6 +39,11 @@
       "perMachine": false,
       "oneClick": true,
       "allowToChangeInstallationDirectory": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "KameyhaFacundo",
+      "repo": "escritorio-launcher"
     }
   }
 }
