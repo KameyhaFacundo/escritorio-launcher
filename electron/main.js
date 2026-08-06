@@ -9,6 +9,27 @@ const {
 } = require('./backend');
 const { getLanIp } = require('./lan-ip');
 const { obtenerCodigoDispositivo, licenciaValida, activar } = require('./license');
+const gdrive = require('./gdrive');
+
+// Sin esto, abrir el ícono dos veces (muy común: tarda en abrir la primera
+// vez y el usuario vuelve a tocar) levanta DOS procesos completos a la vez
+// — ambos corren ensureInitialized() en paralelo contra la MISMA base
+// recién creada y se pisan entre sí creando las tablas, uno de los dos
+// falla a mitad de camino ("table migrations already exists") y deja el
+// usuario admin sin crear (por eso el login fallaba después). Con el lock,
+// la segunda instancia se cierra sola apenas arranca y ni llega a tocar
+// nada — en vez de eso, le pide a la primera que traiga su ventana al
+// frente, como si el segundo click solo hubiera sido eso.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+  return;
+}
+app.on('second-instance', () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.focus();
+});
 
 // Fija el nombre explícito (en vez de dejar que Electron infiera uno del
 // package.json, que da resultados distintos en dev vs empaquetado) — de esto
@@ -109,6 +130,20 @@ async function imprimirTicketDirecto(html) {
 }
 
 ipcMain.handle('imprimir-ticket', (_event, html) => imprimirTicketDirecto(html));
+
+// Backup en la nube — 100% opcional, a pedido del propio dueño del comercio
+// (ver Configuración en el front). Si nunca se conecta, gdrive.subirBackup()
+// en backend.js no hace nada distinto a hoy: el backup local sigue solo.
+ipcMain.handle('drive-conectado', () => gdrive.conectado());
+ipcMain.handle('drive-conectar', async () => {
+  try {
+    await gdrive.conectar();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+ipcMain.handle('drive-desconectar', () => { gdrive.desconectar(); return { ok: true }; });
 
 // Chequea una sola vez, al arrancar — nunca en medio de una sesión, para no
 // interrumpir una venta. Se descarga sola en segundo plano si hay una
