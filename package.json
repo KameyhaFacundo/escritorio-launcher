@@ -1,6 +1,6 @@
 {
   "name": "escritorio-launcher",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Empaqueta back-sistema-stock-escritorio + front-sistema-stock-escritorio como app de escritorio Windows",
   "main": "electron/main.js",
