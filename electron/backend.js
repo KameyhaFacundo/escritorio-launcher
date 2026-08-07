@@ -188,32 +188,44 @@ function stopQueueWorker() {
   }
 }
 
-const BACKUP_MAX_AGE_MS = 24 * 60 * 60 * 1000; // no hace un backup nuevo si ya hay uno de menos de 24h
-const BACKUP_CHECK_INTERVAL_MS = 60 * 60 * 1000; // pero chequea seguido, por si la app queda abierta días
+// Chequea cada una hora por si la app queda abierta días seguidos — pero lo
+// que realmente decide si hace falta un backup nuevo es la fecha del más
+// reciente (ver needsBackupToday), no cuánto hace que corrió este intervalo.
+const BACKUP_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
+function esMismoDiaLocal(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+// Un backup por día del calendario local, no "cada 24h corridas" — con eso
+// solo, cerrar el local a las 20:00 y volver a abrir al otro día a las 09:00
+// (23h de diferencia) se saltaba el backup de ese día entero hasta que la
+// ventana de 24h finalmente se cumplía, a veces un día después.
+function needsBackupToday(backupsDir) {
+  try {
+    const files = fs.readdirSync(backupsDir).filter((f) => f.endsWith('.gz'));
+    if (!files.length) return true;
+    const newest = Math.max(...files.map((f) => fs.statSync(path.join(backupsDir, f)).mtimeMs));
+    return !esMismoDiaLocal(new Date(newest), new Date());
+  } catch {
+    return true; // storage/app/backups todavía no existe — corre el primero.
+  }
+}
 
 /**
  * Corre `php artisan backup:run` (copia + comprime la base SQLite a
- * storage/app/backups) si el más reciente que hay ahí tiene más de 24h, o si
- * todavía no hay ninguno. No hace falta que la app esté cerrada ni nada — el
- * comando lee la base, no la bloquea. Si falla, solo lo loguea: un backup
- * fallido no tiene que tumbar el resto del sistema.
+ * storage/app/backups) si todavía no se hizo ninguno hoy. No hace falta que
+ * la app esté cerrada ni nada — el comando lee la base, no la bloquea. Si
+ * falla, solo lo loguea: un backup fallido no tiene que tumbar el resto del
+ * sistema. onDone(se hizo: bool) se llama siempre, se haya corrido el backup
+ * o no — lo usa el cierre de la app (ver "backup al salir" en main.js) para
+ * saber cuándo ya puede terminar de cerrar.
  */
-function runBackupIfDue() {
+function runBackupIfDue(onDone) {
   const dir = dataDir();
   const backupsDir = path.join(dir, 'storage', 'app', 'backups');
 
-  let needsBackup = true;
-  try {
-    const files = fs.readdirSync(backupsDir).filter((f) => f.endsWith('.gz'));
-    if (files.length > 0) {
-      const newest = Math.max(...files.map((f) => fs.statSync(path.join(backupsDir, f)).mtimeMs));
-      needsBackup = Date.now() - newest > BACKUP_MAX_AGE_MS;
-    }
-  } catch {
-    // storage/app/backups todavía no existe — corre el primero.
-  }
-
-  if (!needsBackup) return;
+  if (!needsBackupToday(backupsDir)) { onDone?.(false); return; }
 
   const proc = spawn(phpBinary(), ['artisan', 'backup:run', '--ansi'], {
     cwd: backendPath(),
@@ -223,7 +235,7 @@ function runBackupIfDue() {
   proc.stdout.on('data', (d) => { salida += d.toString(); console.log(`[backup] ${d}`); });
   proc.stderr.on('data', (d) => console.error(`[backup] ${d}`));
   proc.on('exit', (code) => {
-    if (code !== 0) { console.error(`El backup automático falló (code=${code})`); return; }
+    if (code !== 0) { console.error(`El backup automático falló (code=${code})`); onDone?.(false); return; }
     console.log('Backup automático generado.');
 
     // Solo sube a Drive si ESTE cliente conectó su propia cuenta (ver
@@ -233,6 +245,7 @@ function runBackupIfDue() {
     // más tocó esa carpeta justo en el medio).
     const match = salida.match(/Backup generado:\s*(.+\.gz)/);
     if (match) gdrive.subirBackup(match[1].trim());
+    onDone?.(true);
   });
 }
 
@@ -240,7 +253,7 @@ let backupInterval = null;
 
 function startBackupScheduler() {
   runBackupIfDue();
-  backupInterval = setInterval(runBackupIfDue, BACKUP_CHECK_INTERVAL_MS);
+  backupInterval = setInterval(() => runBackupIfDue(), BACKUP_CHECK_INTERVAL_MS);
 }
 
 function stopBackupScheduler() {
@@ -252,4 +265,5 @@ module.exports = {
   ensureInitialized, startServer, stopServer, PORT,
   startQueueWorker, stopQueueWorker,
   startBackupScheduler, stopBackupScheduler,
+  runBackupIfDue,
 };

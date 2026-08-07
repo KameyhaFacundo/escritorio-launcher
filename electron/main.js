@@ -5,7 +5,7 @@ const path = require('path');
 const {
   ensureInitialized, startServer, stopServer, PORT,
   startQueueWorker, stopQueueWorker,
-  startBackupScheduler, stopBackupScheduler,
+  startBackupScheduler, stopBackupScheduler, runBackupIfDue,
 } = require('./backend');
 const { getLanIp } = require('./lan-ip');
 const { obtenerCodigoDispositivo, licenciaValida, activar } = require('./license');
@@ -303,10 +303,32 @@ async function boot() {
 
 app.whenReady().then(boot);
 
-app.on('before-quit', () => {
-  stopServer();
-  stopQueueWorker();
+// Backup local automático al cerrar la app — así queda un backup fresco del
+// día de trabajo que recién termina, sin depender de que la PC esté prendida
+// a una hora fija (el negocio puede cerrar a cualquier hora, y muchas veces
+// la PC se apaga apenas se cierra el sistema). runBackupIfDue() ya se fija
+// solo si hace falta (no hace un backup nuevo si ya hay uno de hoy) — ver
+// electron/backend.js. event.preventDefault() + un segundo app.quit() es el
+// patrón estándar de Electron para hacer algo async antes de cerrar de una.
+let backupDeCierreHecho = false;
+app.on('before-quit', (event) => {
+  if (backupDeCierreHecho) { stopServer(); stopQueueWorker(); return; }
+  event.preventDefault();
   stopBackupScheduler();
+
+  let yaSeCerro = false;
+  const cerrarDeUna = () => {
+    if (yaSeCerro) return;
+    yaSeCerro = true;
+    backupDeCierreHecho = true;
+    stopServer();
+    stopQueueWorker();
+    app.quit();
+  };
+  // Si el backup se cuelga (PHP no responde, etc.), no hay que dejar al
+  // usuario esperando para siempre con la app "trabada" al querer cerrarla.
+  setTimeout(cerrarDeUna, 15000);
+  runBackupIfDue(cerrarDeUna);
 });
 
 app.on('activate', () => {
