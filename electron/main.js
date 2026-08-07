@@ -8,7 +8,7 @@ const {
   startBackupScheduler, stopBackupScheduler, runBackupIfDue,
 } = require('./backend');
 const { getLanIp } = require('./lan-ip');
-const { obtenerCodigoDispositivo, licenciaValida, activar } = require('./license');
+const { obtenerCodigoDispositivo, licenciaValida, activar, verificarRelojOnline } = require('./license');
 const gdrive = require('./gdrive');
 
 // Fija el nombre explícito ANTES de pedir el lock de instancia única de
@@ -235,6 +235,11 @@ function ensureLicensed() {
       const ok = activar(codigoIngresado);
       if (ok) {
         activado = true;
+        // No bloqueante: si hay internet en este momento, deja guardada la
+        // hora real ya desde la activación — cubre un reloj atrasado a mano
+        // desde ANTES de activar, cuando licenciaValida() todavía no tiene
+        // ninguna marca propia con la cual comparar (ver license.js).
+        verificarRelojOnline();
         actWin.close();
       }
       return ok;
@@ -299,6 +304,10 @@ async function boot() {
   startQueueWorker();
   startBackupScheduler();
   checkForAppUpdates();
+  // No bloqueante — si hay internet, mantiene al día la hora real conocida
+  // por esta instalación (ver verificarRelojOnline en license.js). No hace
+  // falta más que esto una vez por apertura: la marca ya queda guardada.
+  verificarRelojOnline();
 }
 
 app.whenReady().then(boot);
