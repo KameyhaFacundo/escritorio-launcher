@@ -9,4 +9,11 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   imprimirTicket: (html) => ipcRenderer.invoke('imprimir-ticket', html),
   onUpdateListo: (callback) => ipcRenderer.on('app-update-listo', () => callback()),
+  // Backup en la nube, 100% opcional — ver Configuración en el front y
+  // electron/gdrive.js. driveConectar() se queda esperando hasta que el
+  // dueño del comercio termine de aprobar el acceso en el navegador (o
+  // cancele), puede tardar.
+  driveConectado: () => ipcRenderer.invoke('drive-conectado'),
+  driveConectar: () => ipcRenderer.invoke('drive-conectar'),
+  driveDesconectar: () => ipcRenderer.invoke('drive-desconectar'),
 });

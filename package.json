@@ -29,7 +29,8 @@
     ],
     "extraResources": [
       { "from": "resources/backend", "to": "backend" },
-      { "from": "resources/php", "to": "php" }
+      { "from": "resources/php", "to": "php" },
+      { "from": "resources/rclone", "to": "rclone" }
     ],
     "win": {
       "target": "nsis",

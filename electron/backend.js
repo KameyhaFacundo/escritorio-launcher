@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync, spawn } = require('child_process');
 const { backendPath, phpBinary, dataDir } = require('./paths');
+const gdrive = require('./gdrive');
 
 // clientPort viene inyectado por clients/<cliente>/config.json (ver
 // scripts/release.js) — puerto distinto por cliente para que, si dos
@@ -218,11 +219,20 @@ function runBackupIfDue() {
     cwd: backendPath(),
     env: backendEnv(dir),
   });
-  proc.stdout.on('data', (d) => console.log(`[backup] ${d}`));
+  let salida = '';
+  proc.stdout.on('data', (d) => { salida += d.toString(); console.log(`[backup] ${d}`); });
   proc.stderr.on('data', (d) => console.error(`[backup] ${d}`));
   proc.on('exit', (code) => {
-    if (code !== 0) console.error(`El backup automático falló (code=${code})`);
-    else console.log('Backup automático generado.');
+    if (code !== 0) { console.error(`El backup automático falló (code=${code})`); return; }
+    console.log('Backup automático generado.');
+
+    // Solo sube a Drive si ESTE cliente conectó su propia cuenta (ver
+    // gdrive.js) — si no, subirBackup() no hace nada. El nombre exacto del
+    // archivo sale de lo que el propio comando imprimió, no de volver a
+    // listar la carpeta (evita subir por error un backup viejo si algo
+    // más tocó esa carpeta justo en el medio).
+    const match = salida.match(/Backup generado:\s*(.+\.gz)/);
+    if (match) gdrive.subirBackup(match[1].trim());
   });
 }
 

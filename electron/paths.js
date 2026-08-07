@@ -12,9 +12,10 @@ function resourcesRoot() {
 
 const backendPath = () => path.join(resourcesRoot(), 'backend');
 const phpBinary = () => path.join(resourcesRoot(), 'php', 'php.exe');
+const rcloneBinary = () => path.join(resourcesRoot(), 'rclone', 'rclone.exe');
 
 // %APPDATA%\<productName> — separado de donde vive el código (que se
 // reinstala en cada actualización). Acá persiste la base real del comercio.
 const dataDir = () => app.getPath('userData');
 
-module.exports = { backendPath, phpBinary, dataDir };
+module.exports = { backendPath, phpBinary, rcloneBinary, dataDir };

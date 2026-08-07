@@ -14,6 +14,7 @@ const FRONT_REPO = path.join(SIBLINGS, 'front-sistema-stock');
 const RESOURCES = path.join(LAUNCHER_ROOT, 'resources');
 const BACKEND_OUT = path.join(RESOURCES, 'backend');
 const PHP_OUT = path.join(RESOURCES, 'php');
+const RCLONE_OUT = path.join(RESOURCES, 'rclone');
 
 // No entran en el paquete: cosas de dev (tests, git, vendor de dev, datos
 // reales de la base de dev) o cosas que Electron va a crear en %APPDATA% en
@@ -95,8 +96,25 @@ function checkPhp() {
 `);
 }
 
+function checkRclone() {
+  const rcloneExe = path.join(RCLONE_OUT, 'rclone.exe');
+  if (fs.existsSync(rcloneExe)) {
+    console.log(`rclone portátil OK: ${rcloneExe}`);
+    return;
+  }
+  // Sin esto no falla el build (backup a Google Drive es 100% opcional, ver
+  // electron/gdrive.js) pero la app queda instalada sin poder ofrecerlo.
+  console.warn(`
+⚠ Falta rclone portátil en ${RCLONE_OUT}\\rclone.exe — paso manual (una vez,
+  no lo hace este script): bajar el zip de Windows 64-bit desde
+  https://rclone.org/downloads/ y copiar rclone.exe (el .exe suelto, no la
+  carpeta del zip) directo en ${RCLONE_OUT}\\
+`);
+}
+
 copyBackend();
 installComposerDeps();
 buildFront();
 checkPhp();
-console.log('\nresources/ listo (salvo el aviso de PHP arriba, si aplica).');
+checkRclone();
+console.log('\nresources/ listo (salvo los avisos de arriba, si aplican).');
