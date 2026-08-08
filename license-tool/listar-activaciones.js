@@ -19,10 +19,14 @@ if (!registro.length) {
   process.exit(0);
 }
 
-const hoyISO = (() => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-})();
+const hoy = new Date();
+const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+
+// Aviso con margen — sin esto, una renovación de 6 meses recién se nota
+// como "por vencer" el mismo día que ya venció, tarde para avisarle al
+// cliente o generarle el código nuevo a tiempo.
+const DIAS_AVISO_PREVIO = 15;
+const diasHasta = (vence) => Math.round((new Date(`${vence}T00:00:00`) - new Date(`${hoyISO}T00:00:00`)) / 86400000);
 
 // Sin vencimiento (licencia definitiva) va al final — no hay nada que
 // vigilar ahí. Entre las que sí vencen, la más próxima a vencer primero.
@@ -35,11 +39,16 @@ const ordenado = [...registro].sort((a, b) => {
 
 console.log('');
 for (const r of ordenado) {
-  const estado = !r.vence ? 'SIN VENCIMIENTO'
-    : r.vence < hoyISO ? 'VENCIDA'
-    : r.vence === hoyISO ? 'VENCE HOY'
+  if (!r.vence) {
+    console.log(`✓ ${r.cliente.padEnd(20)} ${r.deviceCode.padEnd(22)} ${'SIN VENCIMIENTO'.padEnd(24)} generado ${r.fechaGenerado}`);
+    continue;
+  }
+  const faltan = diasHasta(r.vence);
+  const marca = faltan < 0 ? '✗' : faltan <= DIAS_AVISO_PREVIO ? '⚠' : '✓';
+  const estado = faltan < 0 ? 'VENCIDA'
+    : faltan === 0 ? 'VENCE HOY'
+    : faltan <= DIAS_AVISO_PREVIO ? `vence en ${faltan} días — renovar`
     : `vence ${r.vence}`;
-  const marca = r.vence && r.vence < hoyISO ? '✗' : r.vence && r.vence <= hoyISO ? '⚠' : '✓';
-  console.log(`${marca} ${r.cliente.padEnd(20)} ${r.deviceCode.padEnd(22)} ${estado.padEnd(18)} generado ${r.fechaGenerado}`);
+  console.log(`${marca} ${r.cliente.padEnd(20)} ${r.deviceCode.padEnd(22)} ${estado.padEnd(24)} generado ${r.fechaGenerado}`);
 }
 console.log('');

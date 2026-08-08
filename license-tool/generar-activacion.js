@@ -5,18 +5,37 @@
 // Además deja un registro local en activaciones.json (ver listar-activaciones.js)
 // para no perderte quién tiene qué código y cuándo vence.
 //
-// Uso: node generar-activacion.js <codigo-de-dispositivo> [dias-de-prueba] [nombre-cliente]
-// Ejemplo (licencia sin vencimiento):  node generar-activacion.js K7F2-9XQP-3MRT-8LWD
-// Ejemplo (prueba de 14 días):         node generar-activacion.js K7F2-9XQP-3MRT-8LWD 14 "Palomar"
+// Uso: node generar-activacion.js <codigo-de-dispositivo> [plazo] [nombre-cliente]
+// El plazo admite días sueltos (14), o con sufijo "d"/"m"/"a" (14d, 6m, 1a)
+// para no tener que hacer la cuenta de días a mano. Sin plazo = sin
+// vencimiento (reservalo para casos puntuales — para un cliente que paga,
+// mejor un plazo largo tipo "6m" y renovar vos mismo cuando siga pagando,
+// así si deja de pagar se corta solo en vez de quedar activo para siempre).
+// Ejemplo (prueba de 14 días):        node generar-activacion.js K7F2-9XQP-3MRT-8LWD 14 "Palomar"
+// Ejemplo (renovación de 6 meses):    node generar-activacion.js K7F2-9XQP-3MRT-8LWD 6m "Palomar"
+// Ejemplo (licencia sin vencimiento): node generar-activacion.js K7F2-9XQP-3MRT-8LWD
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+// "14" -> 14 días. "6m" -> 6*30 días (mes aproximado, no hace falta más
+// precisión para esto). "1a" -> 1*365 días.
+function parsearPlazo(texto) {
+  if (!texto) return null;
+  const match = String(texto).trim().match(/^(\d+)([dma]?)$/i);
+  if (!match) return NaN;
+  const cantidad = Number(match[1]);
+  const unidad = (match[2] || 'd').toLowerCase();
+  if (unidad === 'a') return cantidad * 365;
+  if (unidad === 'm') return cantidad * 30;
+  return cantidad;
+}
+
 const deviceCode = (process.argv[2] || '').trim().toUpperCase();
-const dias = process.argv[3] ? Number(process.argv[3]) : null;
+const dias = parsearPlazo(process.argv[3]);
 const nombreCliente = (process.argv[4] || '').trim() || 'Sin nombre';
-if (!deviceCode || (process.argv[3] && (!Number.isFinite(dias) || dias <= 0))) {
-  console.error('Uso: node generar-activacion.js <codigo-de-dispositivo> [dias-de-prueba] [nombre-cliente]');
+if (!deviceCode || Number.isNaN(dias) || dias === 0) {
+  console.error('Uso: node generar-activacion.js <codigo-de-dispositivo> [plazo: 14, 14d, 6m, 1a] [nombre-cliente]');
   process.exit(1);
 }
 
@@ -43,7 +62,7 @@ const codigoActivacion = `${vence}.${firma.toString('base64url')}`;
 
 console.log(`\nCliente: ${nombreCliente}`);
 console.log(`Código de dispositivo: ${deviceCode}`);
-console.log(vence ? `Vence: ${vence} (${dias} día${dias === 1 ? '' : 's'} de prueba)` : 'Sin vencimiento');
+console.log(vence ? `Vence: ${vence} (${dias} día${dias === 1 ? '' : 's'} — renová antes con un código nuevo si sigue pagando)` : 'Sin vencimiento');
 console.log(`Código de activación (pasáselo al cliente):\n`);
 console.log(codigoActivacion);
 console.log('');
