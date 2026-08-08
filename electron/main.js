@@ -77,7 +77,7 @@ async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    title: 'Stock Ferretería',
+    title: app.getName(),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -179,7 +179,10 @@ function checkForAppUpdates() {
     dialog.showMessageBox({
       type: 'info',
       title: 'Actualización lista',
-      message: 'Hay una versión nueva de Stock Ferretería.',
+      // app.getName() es el nombre real de ESTE cliente ("Palomar",
+      // "StockFerreteria", etc. — ver app.setName() más arriba), no un
+      // texto fijo — antes decía "Stock Ferretería" en todos los clientes.
+      message: `Hay una versión nueva de ${app.getName()}.`,
       detail: 'Instalala en un momento sin clientes esperando — no tarda mucho, pero conviene no tener el mostrador ocupado mientras pasa. Si elegís "Más tarde", te lo vuelvo a preguntar la próxima vez que abras el programa.',
       buttons: ['Reiniciar ahora', 'Más tarde'],
       defaultId: 0,
