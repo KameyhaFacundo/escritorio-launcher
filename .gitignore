@@ -7,6 +7,11 @@ dist-installer
 # no se pueden generar más códigos de activación (ver license-tool/).
 license-tool/clave-privada.pem
 
+# Registro local de a quién le diste qué código de activación y cuándo
+# vence (ver generar-activacion.js / listar-activaciones.js) — es un dato
+# de negocio tuyo, no algo para compartir en el repo.
+license-tool/activaciones.json
+
 # Builds por cliente (ver clients/README.md) — solo la plantilla queda en git.
 clients/*
 !clients/README.md
