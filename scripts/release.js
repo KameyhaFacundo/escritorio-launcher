@@ -76,6 +76,15 @@ execFileSync('npx', [
   // — sin esto, dos clientes instalados en la misma PC leerían/pisarían
   // la misma base de datos.
   cliArg('extraMetadata.clientAppName', config.appName),
+  // extraMetadata.name pisa el "name" de package.json que usa electron-builder
+  // (no Electron en runtime) para calcular la carpeta de instalación NSIS
+  // — con oneClick:true + perMachine:false, IGNORA productName a propósito
+  // y arma la carpeta a partir de este campo (ver getWindowsInstallationDirName
+  // en electron-builder). Sin esto, todos los clientes instalaban en la
+  // misma carpeta "escritorio-launcher" pisándose el código entre sí en una
+  // PC con más de un cliente instalado (la data en AppData\Roaming quedaba
+  // aparte gracias a clientAppName, pero el .exe/resources no).
+  cliArg('extraMetadata.name', config.appName),
   // clientPort (ver electron/backend.js): puerto propio por cliente — sin
   // esto, si dos clientes están instalados y uno ya tiene su servidor
   // corriendo en el 8000, el otro terminaba conectándose por error AL

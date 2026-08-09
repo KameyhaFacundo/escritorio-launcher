@@ -62,7 +62,13 @@ clients/
 **Para probar dos clientes en la misma PC** (ej. de desarrollo): con
 `appId`/`appName` distintos, quedan instalados aparte, cada uno con su
 propia carpeta y su propia base — no hace falta desinstalar uno para
-probar el otro.
+probar el otro. Esto depende de que `release.js` mande también
+`extraMetadata.name` (lo hace desde el fix de este mismo commit): sin eso,
+NSIS ignora `productName` para la carpeta de instalación cuando el instalador
+es oneClick (nuestro caso) y usa el `name` de `package.json` — igual para
+todos los clientes — así que dos clientes instalados en la misma PC se
+pisaban el `.exe`/`resources` entre sí (la base de `AppData\Roaming` sí
+quedaba aparte, por `clientAppName`, pero el código no).
 
 ## Publicar una actualización para un cliente puntual
 
