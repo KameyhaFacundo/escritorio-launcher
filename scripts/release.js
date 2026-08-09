@@ -4,12 +4,14 @@
 // su propio canal). Ver clients/README.md.
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 const { execFileSync } = require('child_process');
 
 const LAUNCHER_ROOT = path.join(__dirname, '..');
 const FRONT_REPO = path.join(LAUNCHER_ROOT, '..', 'front-sistema-stock');
 const DEFAULT_CLIENT = 'stock-ferreteria';
 const DEFAULT_PORT = 8000;
+const { owner: GH_OWNER, repo: GH_REPO } = require(path.join(LAUNCHER_ROOT, 'package.json')).build.publish;
 
 const cliente = process.argv[2] || DEFAULT_CLIENT;
 const configPath = path.join(LAUNCHER_ROOT, 'clients', cliente, 'config.json');
@@ -83,3 +85,56 @@ execFileSync('npx', [
   // conectó al backend equivocado).
   cliArg('extraMetadata.clientPort', port),
 ], { cwd: LAUNCHER_ROOT, stdio: 'inherit', shell: true });
+
+publicarRelease().catch((err) => {
+  console.error(`\n⚠ El build se subió bien, pero no se pudo publicar el release solo: ${err.message}`);
+  console.error(`  Entrá a https://github.com/${GH_OWNER}/${GH_REPO}/releases y sacale el "Draft" a mano, si no el auto-update de los clientes no lo va a ver.\n`);
+});
+
+// electron-builder con --publish always SUBE los archivos pero deja el
+// release como DRAFT — invisible para electron-updater (que consulta el
+// feed público, sin login). Un build "exitoso" se puede quedar así sin que
+// nadie lo note, y los clientes instalados nunca ven la actualización
+// aunque el log diga que todo salió bien (pasó de verdad: 3 versiones
+// seguidas quedaron de borrador sin que se notara hasta revisarlo a mano).
+// Esto saca el "Draft" apenas termina de subir, así el paso no depende de
+// acordarse de entrar a GitHub después.
+async function publicarRelease() {
+  const token = process.env.GH_TOKEN;
+  if (!token) throw new Error('No está seteado GH_TOKEN en esta terminal');
+
+  const tag = `v${require(path.join(LAUNCHER_ROOT, 'package.json')).version}`;
+  const releases = await githubApi('GET', `/repos/${GH_OWNER}/${GH_REPO}/releases?per_page=20`, token);
+  const release = releases.find((r) => r.tag_name === tag);
+  if (!release) throw new Error(`No encontré ningún release con tag ${tag}`);
+  if (!release.draft) { console.log(`\nRelease ${tag} ya estaba publicado.`); return; }
+
+  const actualizado = await githubApi('PATCH', `/repos/${GH_OWNER}/${GH_REPO}/releases/${release.id}`, token, { draft: false });
+  console.log(`\nRelease ${tag} publicado: ${actualizado.html_url}`);
+}
+
+function githubApi(method, urlPath, token, body) {
+  return new Promise((resolve, reject) => {
+    const data = body ? JSON.stringify(body) : null;
+    const req = https.request({
+      host: 'api.github.com', path: urlPath, method,
+      headers: {
+        'User-Agent': 'release.js',
+        'Authorization': `token ${token}`,
+        ...(data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {}),
+      },
+    }, (res) => {
+      let out = '';
+      res.on('data', (d) => { out += d; });
+      res.on('end', () => {
+        let parsed;
+        try { parsed = JSON.parse(out); } catch { parsed = null; }
+        if (res.statusCode >= 200 && res.statusCode < 300) resolve(parsed);
+        else reject(new Error(`GitHub API ${method} ${urlPath} -> ${res.statusCode}: ${parsed?.message || out}`));
+      });
+    });
+    req.on('error', reject);
+    if (data) req.write(data);
+    req.end();
+  });
+}
