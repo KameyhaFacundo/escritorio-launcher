@@ -9,6 +9,7 @@ const {
 } = require('./backend');
 const { getLanIp } = require('./lan-ip');
 const { obtenerCodigoDispositivo, licenciaValida, activar, verificarRelojOnline } = require('./license');
+const { enviarHeartbeat } = require('./heartbeat');
 const gdrive = require('./gdrive');
 
 // Fija el nombre explícito ANTES de pedir el lock de instancia única de
@@ -311,6 +312,9 @@ async function boot() {
   // por esta instalación (ver verificarRelojOnline en license.js). No hace
   // falta más que esto una vez por apertura: la marca ya queda guardada.
   verificarRelojOnline();
+  // Le avisa a tu panel central que esta instalación sigue viva — ver
+  // heartbeat.js. Mismo criterio: best-effort, nunca bloquea nada.
+  enviarHeartbeat();
 }
 
 app.whenReady().then(boot);

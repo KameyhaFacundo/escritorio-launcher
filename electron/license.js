@@ -137,4 +137,10 @@ function verificarRelojOnline() {
   });
 }
 
-module.exports = { obtenerCodigoDispositivo, licenciaValida, activar, verificarRelojOnline };
+// Para el heartbeat (ver heartbeat.js) — no repite la lógica de armar/leer
+// el archivo, solo expone el dato que ya está guardado.
+function vencimientoLicencia() {
+  return leerLicencia()?.vence || null;
+}
+
+module.exports = { obtenerCodigoDispositivo, licenciaValida, activar, verificarRelojOnline, vencimientoLicencia };
