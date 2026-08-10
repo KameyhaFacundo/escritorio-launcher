@@ -95,10 +95,21 @@ async function createWindow() {
     height: 800,
     title: app.getName(),
     autoHideMenuBar: true,
+    // show:false + mostrar recién en 'ready-to-show': por default Electron
+    // muestra la ventana ni bien se crea, en blanco, y pinta el contenido
+    // real un instante después — ese hueco en blanco es previo a que cargue
+    // cualquier HTML (el splash con el logo de index.html no alcanza a
+    // cubrirlo, porque la ventana ya se mostró vacía antes de que ese HTML
+    // llegue a pintarse). Con esto la ventana queda oculta hasta que el
+    // primer frame ya está pintado, así se ve el logo desde el instante en
+    // que aparece la ventana, nunca un blanco antes.
+    show: false,
+    backgroundColor: '#111010',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
+  mainWindow.once('ready-to-show', () => mainWindow.show());
 
   // Sin esto, cualquier window.open() del front (WhatsApp en Clientes, Google
   // OAuth, el callback de Mercado Pago, etc.) queda bloqueado en silencio:
