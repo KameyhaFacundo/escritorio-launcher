@@ -59,6 +59,14 @@ function readEnvValue(envPath, key) {
   return line ? line.slice(key.length + 1).trim() : '';
 }
 
+function writeEnvValue(envPath, key, value) {
+  const lineas = fs.readFileSync(envPath, 'utf8').split('\n');
+  const idx = lineas.findIndex((l) => l.startsWith(`${key}=`));
+  if (idx === -1) return;
+  lineas[idx] = `${key}=${value}`;
+  fs.writeFileSync(envPath, lineas.join('\n'));
+}
+
 /**
  * Primer arranque (o arranque normal, es idempotente): asegura que exista
  * .env/base persistentes en dataDir, genera claves si faltan, migra, y
@@ -72,6 +80,19 @@ function ensureInitialized() {
   const envPath = path.join(dir, '.env');
   if (!fs.existsSync(envPath)) {
     fs.copyFileSync(path.join(backendPath(), '.env.production.example'), envPath);
+  }
+
+  // CACHE_DRIVER/SESSION_DRIVER pasaron de "file" a "database" (ver
+  // .env.production.example — el driver de archivos podía colgar todo el
+  // servidor con dos procesos PHP, serve + queue:work, peleándose por el
+  // mismo flock()). Instalaciones que ya existían tienen su .env propio
+  // guardado en dataDir(), que NO se pisa solo con un update — hay que
+  // migrarlo acá a mano, una sola vez, o quedarían con el bug para siempre.
+  if (readEnvValue(envPath, 'CACHE_DRIVER') === 'file') {
+    writeEnvValue(envPath, 'CACHE_DRIVER', 'database');
+  }
+  if (readEnvValue(envPath, 'SESSION_DRIVER') === 'file') {
+    writeEnvValue(envPath, 'SESSION_DRIVER', 'database');
   }
 
   const dbPath = path.join(dir, 'database.sqlite');
