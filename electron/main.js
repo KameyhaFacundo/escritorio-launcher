@@ -21,6 +21,10 @@ function onServerCrash() {
   if (mainWindow) {
     dialog.showErrorBox('El servidor se detuvo', 'Se va a reiniciar automáticamente.');
   }
+  // No espera al próximo heartbeat programado (hasta 15 min) — si hay
+  // internet en este momento, el panel se entera de la caída ahora mismo,
+  // no cuando ya no te acordás ni el cliente sabe si te avisó.
+  enviarHeartbeat();
 }
 
 // Fija el nombre explícito ANTES de pedir el lock de instancia única de

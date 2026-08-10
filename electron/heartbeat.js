@@ -5,8 +5,48 @@
 // bloqueante: si no hay internet o el panel está caído, no pasa nada, la
 // app sigue funcionando 100% offline igual que siempre.
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
 const { obtenerCodigoDispositivo, vencimientoLicencia, datosNegocio } = require('./license');
+const { dataDir } = require('./paths');
 const gdrive = require('./gdrive');
+
+// Manda sola cualquier caída del backend (ver registrarCaida en backend.js)
+// en el próximo heartbeat que salga — así te enterás vos desde el panel sin
+// que el cliente tenga que avisarte "no me anda tal cosa". Se manda solo lo
+// nuevo desde el último envío CONFIRMADO (offset en disco): si no hay
+// internet en ese momento, no se pierde, se reintenta con el próximo
+// heartbeat que sí tenga conexión — el archivo de log no se toca acá, solo
+// se lee.
+const OFFSET_FILENAME = '.crash-log-enviado';
+const MAX_CHARS_ENVIADOS = 8000; // de sobra para las últimas líneas de error; evita un payload gigante si se acumularon varias caídas seguidas offline.
+
+function crashLogPendiente() {
+  try {
+    const logPath = path.join(dataDir(), 'storage', 'logs', 'backend-crashes.log');
+    if (!fs.existsSync(logPath)) return null;
+
+    const offsetPath = path.join(dataDir(), OFFSET_FILENAME);
+    const yaEnviado = fs.existsSync(offsetPath) ? Number(fs.readFileSync(offsetPath, 'utf8')) || 0 : 0;
+    const { size } = fs.statSync(logPath);
+    if (size <= yaEnviado) return null;
+
+    const fd = fs.openSync(logPath, 'r');
+    const buffer = Buffer.alloc(size - yaEnviado);
+    fs.readSync(fd, buffer, 0, buffer.length, yaEnviado);
+    fs.closeSync(fd);
+
+    return { texto: buffer.toString('utf8').slice(-MAX_CHARS_ENVIADOS), offsetFinal: size };
+  } catch {
+    return null;
+  }
+}
+
+function marcarCrashLogEnviado(offsetFinal) {
+  try {
+    fs.writeFileSync(path.join(dataDir(), OFFSET_FILENAME), String(offsetFinal));
+  } catch { /* si no se pudo guardar, el próximo heartbeat vuelve a mandar lo mismo — no pasa nada */ }
+}
 
 function enviarHeartbeat() {
   const pkg = require('../package.json');
@@ -22,6 +62,7 @@ function enviarHeartbeat() {
   }
 
   const { nombreNegocio, emailContacto, telefonoContacto } = datosNegocio();
+  const crashPendiente = crashLogPendiente();
   const payload = JSON.stringify({
     device_code: obtenerCodigoDispositivo(),
     cliente: pkg.clientAppName || pkg.name,
@@ -34,6 +75,7 @@ function enviarHeartbeat() {
     // nube sin depender de que el cliente te escriba — ver el aviso
     // equivalente en la campanita del front (AppContext.jsx).
     drive_conectado: gdrive.conectado(),
+    crash_reciente: crashPendiente?.texto ?? null,
   });
 
   const req = https.request({
@@ -46,7 +88,18 @@ function enviarHeartbeat() {
       'Content-Length': Buffer.byteLength(payload),
       'X-Heartbeat-Key': key,
     },
-  }, (res) => { res.on('data', () => {}); }); // no importa la respuesta, solo mejor esfuerzo
+  }, (res) => {
+    res.on('data', () => {});
+    res.on('end', () => {
+      // Solo avanza el offset si el panel de verdad lo recibió — así un
+      // heartbeat que se manda pero nunca llega (panel caído, corte a mitad
+      // de camino) reintenta el mismo crash_reciente la próxima vez en vez
+      // de darlo por perdido.
+      if (crashPendiente && res.statusCode && res.statusCode < 400) {
+        marcarCrashLogEnviado(crashPendiente.offsetFinal);
+      }
+    });
+  });
 
   req.on('timeout', () => req.destroy());
   req.on('error', () => {}); // sin internet / panel caído — silencioso a propósito
