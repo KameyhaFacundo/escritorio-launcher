@@ -6,6 +6,7 @@
 // app sigue funcionando 100% offline igual que siempre.
 const https = require('https');
 const { obtenerCodigoDispositivo, vencimientoLicencia, datosNegocio } = require('./license');
+const gdrive = require('./gdrive');
 
 function enviarHeartbeat() {
   const pkg = require('../package.json');
@@ -29,6 +30,10 @@ function enviarHeartbeat() {
     nombre_empresa: nombreNegocio,
     email_contacto: emailContacto,
     telefono_contacto: telefonoContacto,
+    // Para que el panel avise qué instalaciones NO tienen respaldo en la
+    // nube sin depender de que el cliente te escriba — ver el aviso
+    // equivalente en la campanita del front (AppContext.jsx).
+    drive_conectado: gdrive.conectado(),
   });
 
   const req = https.request({
