@@ -87,22 +87,41 @@ function ensureInitialized() {
     runArtisan(dir, ['jwt:secret']);
   }
 
-  runArtisan(dir, ['migrate']);
+  // migrate/storage:link bootean un proceso PHP + Laravel entero cada vez que
+  // se llaman (de sobra el cuello de botella real de "tarda en iniciar
+  // sesión": son varios segundos ANTES de que la ventana de login aparezca) —
+  // antes corrían en CADA apertura de la app, no solo después de instalar una
+  // actualización de verdad. Solo hace falta volver a correrlos cuando
+  // resources/ cambió, y eso pasa exactamente cuando la versión instalada es
+  // distinta a la de la última vez que se inicializó esta carpeta de datos.
+  const versionMarkerPath = path.join(dir, '.installed_version');
+  const versionInstalada = fs.existsSync(versionMarkerPath) ? fs.readFileSync(versionMarkerPath, 'utf8').trim() : null;
+  const versionActual = require('../package.json').version;
 
-  if (isFreshInstall) {
-    runArtisan(dir, ['db:seed']);
-  }
+  if (isFreshInstall || versionInstalada !== versionActual) {
+    runArtisan(dir, ['migrate']);
 
-  // public/storage (symlink a storage/app/public, donde viven las imágenes
-  // de productos/logo subidas) tiene que recrearse cada vez: apunta a la
-  // carpeta de datos persistente, no a resources/backend, así que un update
-  // que reemplaza resources/ lo rompe si no se corre esto de nuevo. No es
-  // fatal si falla — symlink() en Windows necesita admin o Developer Mode
-  // habilitado; sin eso solo se pierden las imágenes, no el resto del POS.
-  try {
-    runArtisan(dir, ['storage:link']);
-  } catch (err) {
-    console.error('No se pudo crear storage:link (¿Developer Mode desactivado?):', err.message);
+    if (isFreshInstall) {
+      runArtisan(dir, ['db:seed']);
+    }
+
+    // public/storage (symlink a storage/app/public, donde viven las imágenes
+    // de productos/logo subidas) tiene que recrearse cada vez que resources/
+    // se reemplaza (un update lo rompe si no se corre esto de nuevo) — pero no
+    // en un reinicio normal de la misma versión, donde ya sigue apuntando bien.
+    // No es fatal si falla — symlink() en Windows necesita admin o Developer
+    // Mode habilitado; sin eso solo se pierden las imágenes, no el resto del POS.
+    try {
+      runArtisan(dir, ['storage:link']);
+    } catch (err) {
+      console.error('No se pudo crear storage:link (¿Developer Mode desactivado?):', err.message);
+    }
+
+    // Recién acá, con migrate ya confirmado exitoso (si tiró, ni siquiera
+    // llegamos a esta línea) — así un boot que falla a mitad de camino
+    // reintenta todo de nuevo la próxima vez en vez de quedar "marcado" a
+    // medio inicializar.
+    fs.writeFileSync(versionMarkerPath, versionActual);
   }
 }
 
