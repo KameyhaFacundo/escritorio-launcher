@@ -101,7 +101,12 @@ function licenciaValida() {
 
 // Intenta activar con un código nuevo — si la firma no corresponde a ESTE
 // dispositivo (o está mal tipeado), no guarda nada y devuelve false.
-function activar(codigoIngresado) {
+// nombreNegocio/emailContacto: se piden en la pantalla de activación (ver
+// activacion.html) para que el panel central llegue con nombre desde el
+// primer heartbeat, sin depender de que alguien lo tipee a mano después.
+// No forman parte de la firma (no cambian si validás o no el código) — son
+// solo un dato de contacto, no algo que haya que proteger contra alteración.
+function activar(codigoIngresado, nombreNegocio, emailContacto, telefonoContacto) {
   const deviceCode = obtenerCodigoDispositivo();
   const codigo = (codigoIngresado || '').trim();
   const separador = codigo.lastIndexOf('.');
@@ -110,8 +115,23 @@ function activar(codigoIngresado) {
   const firmaB64 = codigo.slice(separador + 1);
   if (!firmaValida(deviceCode, vence, firmaB64)) return false;
 
-  guardarLicencia({ deviceCode, vence, firma: firmaB64, marcaTiempoMax: Date.now() });
+  guardarLicencia({
+    deviceCode, vence, firma: firmaB64, marcaTiempoMax: Date.now(),
+    nombreNegocio: (nombreNegocio || '').trim(),
+    emailContacto: (emailContacto || '').trim(),
+    telefonoContacto: (telefonoContacto || '').trim(),
+  });
   return true;
+}
+
+// Para el heartbeat (ver heartbeat.js) — mismo criterio que vencimientoLicencia().
+function datosNegocio() {
+  const guardada = leerLicencia();
+  return {
+    nombreNegocio: guardada?.nombreNegocio || null,
+    emailContacto: guardada?.emailContacto || null,
+    telefonoContacto: guardada?.telefonoContacto || null,
+  };
 }
 
 // Best-effort, no bloqueante: si hay internet, adelanta la "marca de tiempo
@@ -143,4 +163,4 @@ function vencimientoLicencia() {
   return leerLicencia()?.vence || null;
 }
 
-module.exports = { obtenerCodigoDispositivo, licenciaValida, activar, verificarRelojOnline, vencimientoLicencia };
+module.exports = { obtenerCodigoDispositivo, licenciaValida, activar, verificarRelojOnline, vencimientoLicencia, datosNegocio };

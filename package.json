@@ -4,7 +4,7 @@
   "private": true,
   "description": "Empaqueta back-sistema-stock-escritorio + front-sistema-stock-escritorio como app de escritorio Windows",
   "main": "electron/main.js",
-  "heartbeatUrl": "https://TODO-cuando-este-deployado-en-railway.up.railway.app/heartbeat",
+  "heartbeatUrl": "https://panel-central-production-0ad4.up.railway.app/heartbeat",
   "heartbeatKey": "0ea118d857b830559e2d6a05268d6f3b1f75752306de4046",
   "scripts": {
     "build-resources": "node scripts/build-resources.js",

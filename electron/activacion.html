@@ -48,6 +48,15 @@
       <button id="copiar">Copiar</button>
     </div>
 
+    <label>Nombre del negocio</label>
+    <input type="text" id="nombreNegocio" placeholder="Ej: Ferretería Palomar" autocomplete="off" />
+
+    <label>Email de contacto</label>
+    <input type="text" id="emailContacto" placeholder="Para avisarte si se vence la licencia" autocomplete="off" />
+
+    <label>Teléfono de contacto</label>
+    <input type="text" id="telefonoContacto" placeholder="Ej: 11 2345-6789" autocomplete="off" />
+
     <label>Código de activación</label>
     <input type="text" id="activationCode" placeholder="Pegá acá el código que te pasaron" autocomplete="off" />
     <button class="primary" id="activar">Activar</button>
@@ -64,14 +73,35 @@
       navigator.clipboard.writeText(code);
     });
 
+    // Regex simple, no exhaustiva — solo para atajar un typo obvio (falta
+    // "@" o el dominio), no para validar RFC 5322 entero.
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     document.getElementById('activar').addEventListener('click', async () => {
       const btn = document.getElementById('activar');
       const errorEl = document.getElementById('error');
-      const code = document.getElementById('activationCode').value;
+      const nombreNegocio = document.getElementById('nombreNegocio').value.trim();
+      const emailContacto = document.getElementById('emailContacto').value.trim();
+      const telefonoContacto = document.getElementById('telefonoContacto').value.trim();
+      const codigo = document.getElementById('activationCode').value;
       errorEl.textContent = '';
+
+      if (!nombreNegocio) {
+        errorEl.textContent = 'Ingresá el nombre del negocio.';
+        return;
+      }
+      if (!EMAIL_RE.test(emailContacto)) {
+        errorEl.textContent = 'Ingresá un email de contacto válido.';
+        return;
+      }
+      if (!telefonoContacto) {
+        errorEl.textContent = 'Ingresá un teléfono de contacto.';
+        return;
+      }
+
       btn.disabled = true;
       btn.textContent = 'Activando...';
-      const ok = await window.licenseAPI.activar(code);
+      const ok = await window.licenseAPI.activar({ codigo, nombreNegocio, emailContacto, telefonoContacto });
       if (!ok) {
         errorEl.textContent = 'Código inválido para esta PC. Revisá que lo hayas copiado completo.';
         btn.disabled = false;

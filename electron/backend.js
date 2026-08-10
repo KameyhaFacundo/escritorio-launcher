@@ -132,6 +132,25 @@ let serverProcess = null;
  * (no por un stop nuestro), lo reinicia. `onReady` se llama una sola vez,
  * cuando el puerto empieza a responder.
  */
+// Últimas líneas de stderr del backend, en memoria — para poder volcarlas al
+// log de caídas si el proceso muere. No se guardan en disco en tiempo real
+// (sería un log gigante para algo que casi nunca hace falta leer), solo el
+// recorte de acá se escribe, y solo cuando de verdad se cayó.
+const MAX_LINEAS_ERROR = 40;
+let ultimasLineasError = [];
+
+// Deja un registro real de cada caída del backend — antes esto solo se
+// imprimía en la consola de DevTools, que nadie mira en la PC de un cliente:
+// cuando pasaba de verdad ("El servidor se detuvo"), no había forma de saber
+// después por qué. Ahora queda un archivo con fecha + código de salida +
+// las últimas líneas de stderr, para poder diagnosticarlo la próxima vez.
+function registrarCaida(dir, code, signal) {
+  try {
+    const linea = `[${new Date().toISOString()}] code=${code} signal=${signal}\n${ultimasLineasError.join('')}\n---\n`;
+    fs.appendFileSync(path.join(dir, 'storage', 'logs', 'backend-crashes.log'), linea);
+  } catch { /* si ni esto se puede escribir, no hay mucho más para hacer */ }
+}
+
 function startServer({ onCrash } = {}) {
   const dir = dataDir();
 
@@ -142,13 +161,18 @@ function startServer({ onCrash } = {}) {
   );
 
   serverProcess.stdout.on('data', (d) => console.log(`[backend] ${d}`));
-  serverProcess.stderr.on('data', (d) => console.error(`[backend] ${d}`));
+  serverProcess.stderr.on('data', (d) => {
+    console.error(`[backend] ${d}`);
+    ultimasLineasError.push(d.toString());
+    if (ultimasLineasError.length > MAX_LINEAS_ERROR) ultimasLineasError.shift();
+  });
 
   serverProcess.on('exit', (code, signal) => {
     const stoppedByUs = serverProcess === null;
     serverProcess = null;
     if (!stoppedByUs) {
       console.error(`El backend se cayó (code=${code}, signal=${signal}), reintentando...`);
+      registrarCaida(dir, code, signal);
       onCrash?.();
       setTimeout(() => startServer({ onCrash }), 1500);
     }

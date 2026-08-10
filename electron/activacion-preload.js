@@ -5,5 +5,5 @@ const { contextBridge, ipcRenderer } = require('electron');
 // sin nada del front de React.
 contextBridge.exposeInMainWorld('licenseAPI', {
   onDeviceCode: (callback) => ipcRenderer.on('device-code', (_event, code) => callback(code)),
-  activar: (code) => ipcRenderer.invoke('activar-licencia', code),
+  activar: (datos) => ipcRenderer.invoke('activar-licencia', datos),
 });

@@ -14,6 +14,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // dueño del comercio termine de aprobar el acceso en el navegador (o
   // cancele), puede tardar.
   driveConectado: () => ipcRenderer.invoke('drive-conectado'),
+  driveEmail: () => ipcRenderer.invoke('drive-email'),
   driveConectar: () => ipcRenderer.invoke('drive-conectar'),
   driveDesconectar: () => ipcRenderer.invoke('drive-desconectar'),
+  // Restaurar desde un .gz elegido a mano — reemplaza la base entera, para
+  // en caso de cambio de PC o pérdida de datos. Ver RESTAURAR-BACKUP.md
+  // (esto automatiza ese mismo procedimiento manual).
+  restaurarBackup: () => ipcRenderer.invoke('restaurar-backup'),
 });

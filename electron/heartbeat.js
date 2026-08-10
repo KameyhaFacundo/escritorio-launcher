@@ -5,7 +5,7 @@
 // bloqueante: si no hay internet o el panel está caído, no pasa nada, la
 // app sigue funcionando 100% offline igual que siempre.
 const https = require('https');
-const { obtenerCodigoDispositivo, vencimientoLicencia } = require('./license');
+const { obtenerCodigoDispositivo, vencimientoLicencia, datosNegocio } = require('./license');
 
 function enviarHeartbeat() {
   const pkg = require('../package.json');
@@ -20,11 +20,15 @@ function enviarHeartbeat() {
     return;
   }
 
+  const { nombreNegocio, emailContacto, telefonoContacto } = datosNegocio();
   const payload = JSON.stringify({
     device_code: obtenerCodigoDispositivo(),
     cliente: pkg.clientAppName || pkg.name,
     version: pkg.version,
     licencia_vence: vencimientoLicencia(),
+    nombre_empresa: nombreNegocio,
+    email_contacto: emailContacto,
+    telefono_contacto: telefonoContacto,
   });
 
   const req = https.request({
@@ -45,4 +49,21 @@ function enviarHeartbeat() {
   req.end();
 }
 
-module.exports = { enviarHeartbeat };
+// Antes solo se mandaba uno al abrir la app — con la app abierta todo el
+// día, "última conexión" en el panel quedaba pegada en el momento del
+// arranque, como si se hubiera desconectado, aunque siguiera en uso. Un
+// reenvío periódico (mismo patrón que el backup automático, ver
+// startBackupScheduler en backend.js) mantiene esa fecha reflejando uso real.
+const HEARTBEAT_INTERVAL_MS = 15 * 60 * 1000;
+let heartbeatInterval = null;
+
+function startHeartbeatScheduler() {
+  heartbeatInterval = setInterval(enviarHeartbeat, HEARTBEAT_INTERVAL_MS);
+}
+
+function stopHeartbeatScheduler() {
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
+  heartbeatInterval = null;
+}
+
+module.exports = { enviarHeartbeat, startHeartbeatScheduler, stopHeartbeatScheduler };
