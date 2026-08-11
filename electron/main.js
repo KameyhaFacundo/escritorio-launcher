@@ -104,7 +104,7 @@ async function createWindow() {
     // primer frame ya está pintado, así se ve el logo desde el instante en
     // que aparece la ventana, nunca un blanco antes.
     show: false,
-    backgroundColor: '#111010',
+    backgroundColor: '#1A1714',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
