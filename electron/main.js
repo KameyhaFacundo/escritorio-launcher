@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, dialog, shell, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const http = require('http');
 const path = require('path');
@@ -48,6 +48,33 @@ function onServerCrash() {
 app.setName(require('../package.json').clientAppName || 'StockFerreteria');
 
 let mainWindow = null;
+
+// Escala general de la interfaz — antes vivía como `zoom: 1.5` en el CSS del
+// front (index.css), pero esa propiedad no estándar rompe el cálculo de
+// posición de TODO lo que Chromium posiciona con `position: fixed` medido
+// por JS (Popover/Menu/Select de MUI, que arman su Paper así): el navegador
+// aplica bien el escalado visual, pero `getBoundingClientRect()` del ancla y
+// el `position:fixed` del Paper terminan en marcos de referencia distintos,
+// así que el menú/popover se renderiza lejos de donde se lo abrió (visto
+// primero en el sidebar con position:fixed+100vh, después en TODOS los
+// selects y en el selector de color de Etiquetas). El zoom nativo de
+// Chromium (el mismo mecanismo que Ctrl+/Ctrl- en cualquier navegador) sí
+// mantiene consistentes getBoundingClientRect/eventos de mouse/position:fixed
+// bajo escala, así que reemplaza por completo al zoom por CSS.
+//
+// OJO: a diferencia del `zoom` de CSS, el zoom nativo SÍ reduce el viewport
+// efectivo que ven los media queries (@media / useMediaQuery de MUI) — es
+// zoom de verdad, como Ctrl+ en cualquier navegador, así que a más zoom
+// "entra" menos ancho en CSS px y la app puede caer sola por debajo de sus
+// propios breakpoints de escritorio (sidebar colapsando a hamburguer como en
+// mobile, etc.). Con 1.5x en una notebook común eso pasaba de verdad — se
+// bajó a 1.05x para dejar margen de sobra por encima del breakpoint 'md'
+// (900px) de MUI en la mayoría de las resoluciones de notebook.
+//
+// zoomLevel usa escala logarítmica (factor = 1.2^nivel) — no hay setter
+// directo por "factor" que persista de forma confiable antes de la primera
+// carga, así que se precalcula el nivel equivalente al factor de abajo.
+const BASE_ZOOM_LEVEL = Math.log(1.05) / Math.log(1.2);
 
 // Sin esto, abrir el ícono dos veces (muy común: tarda en abrir la primera
 // vez y el usuario vuelve a tocar) levanta DOS procesos completos a la vez
@@ -109,7 +136,10 @@ async function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  // 1280x800 fijo se ve chico en un monitor moderno (sobre todo comparado
+  // con probar el front en un navegador maximizado) — arranca maximizada
+  // por default, igual se puede desmaximizar a mano si alguien lo prefiere.
+  mainWindow.once('ready-to-show', () => { mainWindow.maximize(); mainWindow.show(); });
 
   // Sin esto, cualquier window.open() del front (WhatsApp en Clientes, Google
   // OAuth, el callback de Mercado Pago, etc.) queda bloqueado en silencio:
@@ -133,17 +163,30 @@ async function createWindow() {
   // teclado en español/latam, Ctrl y la tecla "+/=" sin Shift produce "=",
   // no "+", y el acelerador registrado espera el símbolo exacto. Manejarlo
   // acá directo (por código físico de tecla, no por el símbolo que produce)
-  // funciona sin importar el layout. autoHideMenuBar arriba tampoco ayuda:
-  // esconde la barra, no da atajos propios.
-  mainWindow.webContents.on('before-input-event', (_event, input) => {
+  // funciona sin importar el layout. autoHideMenuBar arriba NO alcanza:
+  // esconde la barra, pero el menú (y sus atajos default, que pueden pisar
+  // a este handler) sigue existiendo — hay que sacarlo del todo.
+  Menu.setApplicationMenu(null);
+  mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown' || !input.control || input.meta) return;
     if (input.code === 'Equal' || input.code === 'NumpadAdd') {
+      event.preventDefault();
       mainWindow.webContents.zoomLevel = Math.min(5, mainWindow.webContents.zoomLevel + 0.5);
     } else if (input.code === 'Minus' || input.code === 'NumpadSubtract') {
+      event.preventDefault();
       mainWindow.webContents.zoomLevel = Math.max(-5, mainWindow.webContents.zoomLevel - 0.5);
     } else if (input.code === 'Digit0' || input.code === 'Numpad0') {
-      mainWindow.webContents.zoomLevel = 0;
+      event.preventDefault();
+      mainWindow.webContents.zoomLevel = BASE_ZOOM_LEVEL;
     }
+  });
+
+  // Aplica la escala base 1.5x acá (no en 'ready-to-show' ni una sola vez):
+  // 'dom-ready' dispara en CADA carga/recarga (incluyendo el reintento de
+  // lazyWithRetry.js tras un chunk-load-failure), así que el zoom nunca
+  // vuelve a 100% sin querer si el front recarga solo por otra razón.
+  mainWindow.webContents.on('dom-ready', () => {
+    mainWindow.webContents.zoomLevel = BASE_ZOOM_LEVEL;
   });
 
   // index.html no tiene hash de contenido en el nombre (a diferencia de los
@@ -156,22 +199,41 @@ async function createWindow() {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+// Impresoras virtuales que Windows trae instaladas de fábrica (Print to PDF,
+// XPS, Fax, OneNote) — getPrintersAsync() las devuelve igual que una térmica
+// real, así que en cualquier PC sin impresora física de verdad "hay
+// impresoras" igual. Pedirles print({silent:true}) no funciona: esperan un
+// diálogo de guardado que el modo silencioso nunca les da, y la promesa se
+// queda colgada para siempre — ni imprime, ni cae al flujo de la ventana
+// visible, ni tira error. El síntoma real (probado en vivo): tocás
+// "Imprimir Ticket" y no pasa nada, ni ventana ni descarga ni error.
+const IMPRESORAS_VIRTUALES = /pdf|xps|onenote|fax/i;
+
 // Imprime el ticket directo a la impresora del sistema, sin mostrar el
-// diálogo de impresión — solo si hay al menos una impresora instalada. Si no
-// hay ninguna, devuelve printed:false y el front cae al flujo de siempre
-// (ventana con el ticket, para que lo impriman a mano o solo lo vean).
+// diálogo de impresión — solo si hay al menos una impresora FÍSICA instalada
+// (se filtran las virtuales, ver arriba). Si no hay ninguna, devuelve
+// printed:false y el front cae al flujo de siempre (ventana con el ticket,
+// para que lo impriman a mano, lo guarden como PDF o solo lo vean).
 async function imprimirTicketDirecto(html) {
   const printers = await mainWindow?.webContents.getPrintersAsync().catch(() => []) ?? [];
-  if (!printers.length) return { printed: false };
+  const printersReales = printers.filter((p) => !IMPRESORAS_VIRTUALES.test(p.name));
+  if (!printersReales.length) return { printed: false };
 
   const win = new BrowserWindow({ show: false });
   try {
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-    await new Promise((resolve, reject) => {
-      win.webContents.print({ silent: true, printBackground: true }, (success, reason) => {
-        success ? resolve() : reject(new Error(reason || 'No se pudo imprimir'));
-      });
-    });
+    // Resguardo aparte del filtro de arriba: si por lo que sea el callback de
+    // print() nunca llega (driver colgado, etc.), esto igual corta a los 8s
+    // y cae al flujo de la ventana visible en vez de dejar al cajero
+    // esperando sin saber si pasó algo.
+    await Promise.race([
+      new Promise((resolve, reject) => {
+        win.webContents.print({ silent: true, printBackground: true }, (success, reason) => {
+          success ? resolve() : reject(new Error(reason || 'No se pudo imprimir'));
+        });
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Tiempo de espera agotado al imprimir')), 8000)),
+    ]);
     return { printed: true };
   } catch (err) {
     return { printed: false, error: err.message };
@@ -196,6 +258,27 @@ ipcMain.handle('drive-conectar', async () => {
   }
 });
 ipcMain.handle('drive-desconectar', () => { gdrive.desconectar(); return { ok: true }; });
+
+// El front antes solo sabía de "último backup" por localStorage, que se
+// pisaba nada más al tocar "Descargar backup" a mano — el backup diario
+// automático (ver startBackupScheduler en backend.js) corría en silencio y
+// la pantalla de Configuración nunca se enteraba. Esto lee la carpeta real
+// de backups y devuelve la fecha del más reciente, se haya generado por el
+// scheduler o a mano — mismo archivo, misma carpeta, no hay diferencia real
+// entre ambos casos salvo quién lo disparó.
+ipcMain.handle('ultimo-backup-info', () => {
+  const backupsDir = path.join(dataDir(), 'storage', 'app', 'backups');
+  try {
+    const archivos = fs.readdirSync(backupsDir).filter((f) => f.endsWith('.gz'));
+    if (archivos.length === 0) return { fecha: null, enDrive: false };
+    const masReciente = archivos
+      .map((f) => fs.statSync(path.join(backupsDir, f)).mtimeMs)
+      .reduce((a, b) => Math.max(a, b));
+    return { fecha: new Date(masReciente).toISOString(), enDrive: gdrive.conectado() };
+  } catch {
+    return { fecha: null, enDrive: false };
+  }
+});
 
 // Restaurar un backup .gz directo desde Configuración — antes era un
 // procedimiento 100% manual (ver RESTAURAR-BACKUP.md: cerrar la app,
