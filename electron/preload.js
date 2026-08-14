@@ -8,6 +8,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 // front tiene que chequear que exista antes de usarlo.
 contextBridge.exposeInMainWorld('electronAPI', {
   imprimirTicket: (html) => ipcRenderer.invoke('imprimir-ticket', html),
+  // Si no hay impresora física, el front baja el ticket como PDF en vez de
+  // depender del diálogo de impresión — ver 'generar-ticket-pdf' en main.js.
+  generarTicketPdf: (html) => ipcRenderer.invoke('generar-ticket-pdf', html),
   onUpdateListo: (callback) => ipcRenderer.on('app-update-listo', () => callback()),
   // Backup en la nube, 100% opcional — ver Configuración en el front y
   // electron/gdrive.js. driveConectar() se queda esperando hasta que el

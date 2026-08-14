@@ -244,6 +244,35 @@ async function imprimirTicketDirecto(html) {
 
 ipcMain.handle('imprimir-ticket', (_event, html) => imprimirTicketDirecto(html));
 
+// Cuando no hay impresora física, el front baja el ticket como PDF en vez de
+// abrir una ventana y disparar el diálogo de impresión del navegador — ese
+// diálogo depende de que Windows tenga una impresora virtual "Imprimir a
+// PDF" instalada y funcionando, y de que el cajero sepa usarlo (mismo tipo
+// de problema que imprimirTicketDirecto ya resuelve para la impresión
+// directa). printToPDF corre sobre el mismo HTML autocontenido del ticket,
+// sin re-armar el diseño en otro formato — el front lo baja como cualquier
+// otro PDF del sistema (Blob + descarga), sin diálogos ni pasos manuales.
+async function generarTicketPdf(html) {
+  const win = new BrowserWindow({ show: false });
+  try {
+    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    // 80mm de ancho (mismo @page del HTML del ticket) x 400mm de alto — un
+    // ticket real nunca llega a esa altura, pero un solo "página" generosa
+    // evita que un ticket largo (muchos ítems) se corte a mitad de camino
+    // en una segunda hoja, que no tiene sentido para un comprobante térmico.
+    const buffer = await win.webContents.printToPDF({
+      printBackground: true,
+      pageSize: { width: 80000, height: 400000 },
+      margins: { marginType: 'none' },
+    });
+    return buffer.toString('base64');
+  } finally {
+    if (!win.isDestroyed()) win.close();
+  }
+}
+
+ipcMain.handle('generar-ticket-pdf', (_event, html) => generarTicketPdf(html));
+
 // Backup en la nube — 100% opcional, a pedido del propio dueño del comercio
 // (ver Configuración en el front). Si nunca se conecta, gdrive.subirBackup()
 // en backend.js no hace nada distinto a hoy: el backup local sigue solo.
