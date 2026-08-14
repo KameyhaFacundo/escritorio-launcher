@@ -7,7 +7,7 @@ const zlib = require('zlib');
 const {
   ensureInitialized, startServer, stopServer, PORT,
   startQueueWorker, stopQueueWorker,
-  startBackupScheduler, stopBackupScheduler, runBackupIfDue,
+  startBackupScheduler, stopBackupScheduler, runBackupIfDue, ejecutarBackup,
 } = require('./backend');
 const { getLanIp } = require('./lan-ip');
 const { obtenerCodigoDispositivo, licenciaValida, activar, verificarRelojOnline } = require('./license');
@@ -308,6 +308,14 @@ ipcMain.handle('ultimo-backup-info', () => {
     return { fecha: null, enDrive: false };
   }
 });
+
+// Alternativa manual al backup automático diario (ver runBackupIfDue en
+// backend.js) — mismo comando exacto (ejecutarBackup), disparado a pedido
+// en vez de esperar a que le toque el horario. El automático sigue
+// corriendo solo igual, esto no lo reemplaza ni lo reprograma.
+ipcMain.handle('ejecutar-backup-ahora', () => new Promise((resolve) => {
+  ejecutarBackup((ok) => resolve({ ok }));
+}));
 
 // Restaurar un backup .gz directo desde Configuración — antes era un
 // procedimiento 100% manual (ver RESTAURAR-BACKUP.md: cerrar la app,

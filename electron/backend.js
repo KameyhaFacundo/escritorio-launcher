@@ -278,19 +278,18 @@ function needsBackupToday(backupsDir) {
 
 /**
  * Corre `php artisan backup:run` (copia + comprime la base SQLite a
- * storage/app/backups) si todavía no se hizo ninguno hoy. No hace falta que
- * la app esté cerrada ni nada — el comando lee la base, no la bloquea. Si
- * falla, solo lo loguea: un backup fallido no tiene que tumbar el resto del
- * sistema. onDone(se hizo: bool) se llama siempre, se haya corrido el backup
- * o no — lo usa el cierre de la app (ver "backup al salir" en main.js) para
- * saber cuándo ya puede terminar de cerrar.
+ * storage/app/backups) de una, sin importar si ya se hizo uno hoy. No hace
+ * falta que la app esté cerrada ni nada — el comando lee la base, no la
+ * bloquea. Si falla, solo lo loguea: un backup fallido no tiene que tumbar
+ * el resto del sistema. onDone(se hizo: bool) se llama siempre.
+ *
+ * La usan tanto runBackupIfDue() de abajo (el automático diario) como el
+ * botón "Hacer backup ahora" de Configuración (ver 'ejecutar-backup-ahora'
+ * en main.js) — mismo comando, la única diferencia es si hay que chequear
+ * la fecha antes o se dispara directo porque lo pidió el dueño del negocio.
  */
-function runBackupIfDue(onDone) {
+function ejecutarBackup(onDone) {
   const dir = dataDir();
-  const backupsDir = path.join(dir, 'storage', 'app', 'backups');
-
-  if (!needsBackupToday(backupsDir)) { onDone?.(false); return; }
-
   const proc = spawn(phpBinary(), ['artisan', 'backup:run', '--ansi'], {
     cwd: backendPath(),
     env: backendEnv(dir),
@@ -299,8 +298,8 @@ function runBackupIfDue(onDone) {
   proc.stdout.on('data', (d) => { salida += d.toString(); console.log(`[backup] ${d}`); });
   proc.stderr.on('data', (d) => console.error(`[backup] ${d}`));
   proc.on('exit', (code) => {
-    if (code !== 0) { console.error(`El backup automático falló (code=${code})`); onDone?.(false); return; }
-    console.log('Backup automático generado.');
+    if (code !== 0) { console.error(`El backup falló (code=${code})`); onDone?.(false); return; }
+    console.log('Backup generado.');
 
     // Solo sube a Drive si ESTE cliente conectó su propia cuenta (ver
     // gdrive.js) — si no, subirBackup() no hace nada. El nombre exacto del
@@ -311,6 +310,21 @@ function runBackupIfDue(onDone) {
     if (match) gdrive.subirBackup(match[1].trim());
     onDone?.(true);
   });
+}
+
+/**
+ * Corre ejecutarBackup() solo si todavía no se hizo ninguno hoy — es la que
+ * usa el scheduler automático (ver startBackupScheduler más abajo). onDone
+ * también se llama cuando NO hacía falta (false) — lo usa el cierre de la
+ * app (ver "backup al salir" en main.js) para saber cuándo ya puede
+ * terminar de cerrar.
+ */
+function runBackupIfDue(onDone) {
+  const dir = dataDir();
+  const backupsDir = path.join(dir, 'storage', 'app', 'backups');
+
+  if (!needsBackupToday(backupsDir)) { onDone?.(false); return; }
+  ejecutarBackup(onDone);
 }
 
 let backupInterval = null;
@@ -329,5 +343,5 @@ module.exports = {
   ensureInitialized, startServer, stopServer, PORT,
   startQueueWorker, stopQueueWorker,
   startBackupScheduler, stopBackupScheduler,
-  runBackupIfDue,
+  runBackupIfDue, ejecutarBackup,
 };

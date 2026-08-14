@@ -23,6 +23,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Fecha real del último backup (automático o manual, es el mismo archivo)
   // — antes el front solo sabía de los manuales, vía localStorage.
   ultimoBackupInfo: () => ipcRenderer.invoke('ultimo-backup-info'),
+  // Dispara el mismo backup automático (comprime + sube a Drive si está
+  // conectado) a pedido, sin esperar al horario programado — ver
+  // 'ejecutar-backup-ahora' en main.js.
+  ejecutarBackupAhora: () => ipcRenderer.invoke('ejecutar-backup-ahora'),
   // Restaurar desde un .gz elegido a mano — reemplaza la base entera, para
   // en caso de cambio de PC o pérdida de datos. Ver RESTAURAR-BACKUP.md
   // (esto automatiza ese mismo procedimiento manual).
