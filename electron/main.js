@@ -168,7 +168,19 @@ async function createWindow() {
   // a este handler) sigue existiendo — hay que sacarlo del todo.
   Menu.setApplicationMenu(null);
   mainWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.type !== 'keyDown' || !input.control || input.meta) return;
+    if (input.type !== 'keyDown') return;
+    // F12 para las DevTools — el menú default de Electron traía este atajo
+    // (junto con Ctrl+Shift+I) colgado de un item de menú, pero ese menú se
+    // saca del todo arriba (setApplicationMenu(null)) para que no le pise
+    // el paso al manejo de zoom de más abajo. Sin esto no había forma de
+    // abrir las DevTools en el build empaquetado para diagnosticar un bug
+    // en la PC de un cliente.
+    if (input.code === 'F12') {
+      event.preventDefault();
+      mainWindow.webContents.toggleDevTools();
+      return;
+    }
+    if (!input.control || input.meta) return;
     if (input.code === 'Equal' || input.code === 'NumpadAdd') {
       event.preventDefault();
       mainWindow.webContents.zoomLevel = Math.min(5, mainWindow.webContents.zoomLevel + 0.5);
