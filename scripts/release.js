@@ -93,6 +93,12 @@ execFileSync('npx', [
   // en la misma PC, sin que se hubiera guardado nada mal — solo se
   // conectó al backend equivocado).
   cliArg('extraMetadata.clientPort', port),
+  // clientId/clientSecret de Google Drive propio de ESTE cliente (ver
+  // electron/gdrive.js): rclone avisa que su client_id compartido se retira
+  // durante 2026 — con credenciales propias por cliente, la subida de
+  // backups a Drive no depende de la suerte de la comunidad de rclone.
+  cliArg('extraMetadata.driveClientId', config.driveClientId || ''),
+  cliArg('extraMetadata.driveClientSecret', config.driveClientSecret || ''),
 ], { cwd: LAUNCHER_ROOT, stdio: 'inherit', shell: true });
 
 publicarRelease().catch((err) => {
